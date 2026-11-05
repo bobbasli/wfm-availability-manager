@@ -1,3 +1,7 @@
+WFM Availability Manager v0.1.9.4
+
+Fix: parse completed Genesys schedule query responses from result.agentSchedules, match the selected user by user.id, render shifts as read-only green segments in the existing timeline. Clearer messages when no matching shifts are in the visible date range. Existing unavailable-times editing and Tailwind header unchanged.
+
 WFM Availability Manager v0.1.9.3
 
 Fix: robust Week-ID resolution from Genesys weekDate or canonical selfUri, including nested raw objects; metadata/query use resolved value. Cache-busted app.js URL. Read-only schedule unchanged; unavailable times editor unchanged.

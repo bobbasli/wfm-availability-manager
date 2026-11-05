@@ -24,7 +24,9 @@ createApp({
     const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
     const scheduleSegments=computed(()=>{
       const root=scheduleData.value;if(!root)return [];
-      const rows=Array.isArray(root)?root:(root.entities||root.agentSchedules||root.results||root.items||root.schedules||[]);
+      // Genesys returns completed schedule queries under result.agentSchedules.
+      const payload=root.result||root;
+      const rows=Array.isArray(payload)?payload:(payload.agentSchedules||payload.entities||payload.results||payload.items||payload.schedules||[]);
       const segments=[];
       function addSpan(span,label){
         if(!span)return;
@@ -42,7 +44,8 @@ createApp({
         }
       }
       for(const r of rows){
-        if(r.userId&&r.userId!==agentId.value)continue;
+        const rowAgentId=r.user?.id||r.userId||r.agent?.id||r.agentId;
+        if(rowAgentId!==agentId.value)continue;
         const shifts=r.shifts||r.shiftAssignments||r.scheduledShifts||r.shiftSegments||[];
         for(const shift of shifts){
           const span=shift.timeSpan||shift;
@@ -105,7 +108,8 @@ createApp({
         const result=await api(`${prefix}/agentschedules/query`,'POST',{managementUnitId:mu,userIds:[agent],teamIds:[]});
         if(bu!==businessUnit.value||mu!==managementUnit.value||agent!==agentId.value)return;
         scheduleData.value=result;scheduleDiagnostics.value={schedule:candidate.raw,resolvedWeekId,metadata,response:result};
-        scheduleState.value=scheduleSegments.value.length?'Rooster geladen.':'Rooster opgehaald; diensttijden nog niet herkend. Bekijk de diagnose.';
+        const agentRows=(result?.result?.agentSchedules||result?.agentSchedules||[]).filter(x=>(x.user?.id||x.userId||x.agent?.id||x.agentId)===agent);
+        scheduleState.value=scheduleSegments.value.length?'Rooster geladen.':agentRows.length?'Rooster opgehaald; geen diensten zichtbaar binnen de gekozen datums.':'Rooster opgehaald; geen roostergegevens voor deze medewerker. Bekijk de diagnose.';
       }catch(e){scheduleError.value=e.message;scheduleState.value='Rooster ophalen mislukt.';}
       finally{scheduleBusy.value=false;}
     }
