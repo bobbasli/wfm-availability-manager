@@ -1,37 +1,14 @@
-WFM Availability Manager v0.1.9.4
+# WFM Availability Manager v0.1.9.5.2
 
-Fix: parse completed Genesys schedule query responses from result.agentSchedules, match the selected user by user.id, render shifts as read-only green segments in the existing timeline. Clearer messages when no matching shifts are in the visible date range. Existing unavailable-times editing and Tailwind header unchanged.
+Herstelrelease op basis van v0.1.9.5.
 
-WFM Availability Manager v0.1.9.3
+- Activity Codes worden alleen verwerkt als de API daadwerkelijk een array met objecten teruggeeft.
+- Onverwachte Activity Codes-response geeft een waarschuwing in plaats van een vastlopende weergave.
+- Kleurvelden die objecten zijn worden veilig uitgelezen.
+- Rooster- en activiteitarrays worden defensief verwerkt.
+- De bestaande Unavailable Times-editor, gepubliceerde roosters en Tailwind-header blijven behouden.
+- Cache-busting app.js?v=0.1.9.5.2.
 
-Fix: robust Week-ID resolution from Genesys weekDate or canonical selfUri, including nested raw objects; metadata/query use resolved value. Cache-busted app.js URL. Read-only schedule unchanged; unavailable times editor unchanged.
+Upload index.html en app.js samen naar GitHub Pages. Bij een blijvende blanco pagina graag de exacte eerste rode fout uit de browserconsole (F12 > Console) delen.
 
-# WFM Availability Manager v0.1.9.2
-
-Vue 3 + Tailwind CSS prototype for Genesys Cloud (EU Central). Deploy `index.html` and `app.js` together on GitHub Pages.
-
-## New
-- Unified daily timeline: editable red Unavailable Times and read-only green published schedule segments.
-- Schedule discovery via `GET /api/v2/workforcemanagement/businessunits/{businessUnitId}/weeks/recent/schedules`.
-- Metadata via `GET /api/v2/workforcemanagement/businessunits/{businessUnitId}/weeks/{weekId}/schedules/{scheduleId}`.
-- Agent schedule via `POST .../agentschedules/query` with `{managementUnitId,userIds:[agentId],teamIds:[]}`.
-- Multiple published schedules require explicit selection. No schedule write endpoints are used.
-
-## Important
-The actual schedule response shape and week IDs have not been verified against a live Genesys environment. The schedule week path uses the explicit `weekDate` returned by Genesys when `weekId` is absent. If the response has an unexpected shape, the application shows a diagnostic. Work Plan integration is not yet implemented.
-
-Test with a test user before use. OAuth configuration remains as in v0.1.8.
-
-## v0.1.9.2
-- Genesys Cloud-inspired header gradient using Tailwind utility classes (#3d538f → #263b73 → #152550).
-- Header button styling and keyboard focus color #5476d5.
-- No changes to schedule API or availability editing logic.
-
-
-## v0.1.9.5 — Activity Codes
-- GET /api/v2/workforcemanagement/managementunits/{managementUnitId}/activitycodes bij roosterzoeken.
-- Roosteractiviteiten uit `result.agentSchedules[].shifts[].activities`, met kleuren en namen uit de Activity Codes.
-- Hover op activiteit toont naam en lokale begin-/eindtijd.
-- Bij ontbrekende kleur blijft de dienst groen; er worden geen fictieve kleuren gebruikt.
-- Activity Code-fouten zijn niet fataal voor de bestaande roosterweergave.
-- Alleen-lezen voor rooster, Unavailable Times-editor onveranderd.
+Fix: Activity Codes worden altijd naar een array genormaliseerd; geen .map() op een object.

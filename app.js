@@ -23,9 +23,10 @@ createApp({
     const scheduleCandidates=ref([]),selectedSchedule=ref(''),scheduleDiagnostics=ref(null);
     const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
     const activityCodes=ref([]),activityCodeError=ref('');
-    const activityCodeMap=computed(()=>new Map(activityCodes.value.map(c=>[String(c.id),c])));
+    const activityCodeMap=computed(()=>new Map((Array.isArray(activityCodes.value)?activityCodes.value:[]).filter(c=>c&&typeof c==='object'&&c.id!=null).map(c=>[String(c.id),c])));
     function codeColor(code){
-      const raw=code?.color?.hex||code?.color?.value||code?.color?.code||code?.color||code?.hexColor||code?.colorCode||code?.backgroundColor;
+      const candidate=code?.color;
+      const raw=(typeof candidate==='string'?candidate:(candidate&&typeof candidate==='object'?(candidate.hex||candidate.value||candidate.code):null))||code?.hexColor||code?.colorCode||code?.backgroundColor;
       if(typeof raw!=='string')return null;
       const color=raw.trim();
       if(/^#[0-9a-f]{3}([0-9a-f]{3})?([0-9a-f]{2})?$/i.test(color))return color;
@@ -39,14 +40,21 @@ createApp({
       try{
         const data=await api(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/activitycodes`);
         if(mu!==managementUnit.value)return;
-        activityCodes.value=Array.isArray(data)?data:(data.entities||data.activityCodes||data.results||data.items||[]);
+        // Activity Codes endpoints may return an array, paged entities or a keyed object.
+        // Keep the Vue state strictly an array; never store the raw response in it.
+        const payload=data?.result??data;
+        const source=Array.isArray(payload)?payload:(payload?.entities??payload?.activityCodes??payload?.results??payload?.items??payload?.data??[]);
+        const items=Array.isArray(source)?source:(source&&typeof source==='object'?Object.entries(source).map(([id,value])=>value&&typeof value==='object'?{id,...value}:null):[]);
+        activityCodes.value=items.filter(x=>x&&typeof x==='object'&&x.id!=null);
+        if(!Array.isArray(source)&&(!source||typeof source!=='object'))activityCodeError.value='Activity Codes-response heeft een onbekende structuur; rooster blijft beschikbaar.';
       }catch(e){if(mu===managementUnit.value)activityCodeError.value=`Activity Codes konden niet worden opgehaald: ${e.message}`;}
     }
     const scheduleSegments=computed(()=>{
       const root=scheduleData.value;if(!root)return [];
       // Genesys returns completed schedule queries under result.agentSchedules.
       const payload=root.result||root;
-      const rows=Array.isArray(payload)?payload:(payload.agentSchedules||payload.entities||payload.results||payload.items||payload.schedules||[]);
+      const candidates=Array.isArray(payload)?payload:(payload.agentSchedules||payload.entities||payload.results||payload.items||payload.schedules||[]);
+      const rows=Array.isArray(candidates)?candidates:[];
       const segments=[];
       function addSpan(span,label,color=null,kind='shift'){
         if(!span)return;
@@ -66,11 +74,12 @@ createApp({
       for(const r of rows){
         const rowAgentId=r.user?.id||r.userId||r.agent?.id||r.agentId;
         if(rowAgentId!==agentId.value)continue;
-        const shifts=r.shifts||r.shiftAssignments||r.scheduledShifts||r.shiftSegments||[];
+        const shiftData=r.shifts||r.shiftAssignments||r.scheduledShifts||r.shiftSegments||[];
+        const shifts=Array.isArray(shiftData)?shiftData:[];
         for(const shift of shifts){
           const span=shift.timeSpan||shift;
           addSpan(span,shift.name||shift.activityCode?.name||'Roosterdienst',null,'shift');
-          for(const activity of (shift.activities||[])){
+          for(const activity of (Array.isArray(shift.activities)?shift.activities:[])){
             const code=activityCodeMap.value.get(String(activity.activityCodeId??activity.activityCode?.id??''));
             const name=code?.name||code?.description||activity.activityCode?.name||activity.description||`Activity Code ${activity.activityCodeId??'onbekend'}`;
             addSpan(activity,name,codeColor(code),'activity');
