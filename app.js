@@ -19,6 +19,34 @@ createApp({
     const patchBody=ref(''),confirmed=ref(false),lastResponse=ref(null),raw=ref('Nog geen response.');
     const status=ref('Klaar.'),error=ref(false),busy=ref(false);
     const records=computed(()=>{const d=lastResponse.value;if(!d)return [];return Array.isArray(d)?d:(d.entities||d.unavailableTimes||d.results||d.items||d.days||[]);});
+    const timeOf = v => {if(typeof v!=='string')return null;const m=v.match(/(?:T|^)(\d{2}):(\d{2})(?::\d{2})?/);if(!m)return null;const n=Number(m[1])*60+Number(m[2]);return n>=0&&n<=1440?n:null;};
+    const dateOf = v => typeof v==='string'&&/^\d{4}-\d{2}-\d{2}/.test(v)?v.slice(0,10):null;
+    const normalized = computed(()=>{
+      const data=records.value;const out=[];
+      const original=lastResponse.value;
+      if(original && !Array.isArray(original) && !['entities','unavailableTimes','results','items','days'].some(k=>Array.isArray(original[k])))return null;
+      if(!Array.isArray(data))return null;
+      for(const item of data){
+        if(!item || typeof item!=='object')return null;
+        const intervals=Array.isArray(item.intervals)?item.intervals:Array.isArray(item.timeSlots)?item.timeSlots:null;
+        if(intervals){const date=dateOf(item.date||item.day||item.startDate);if(!date)return null;
+          for(const t of intervals){const a=timeOf(t.startTime||t.start||t.startDateTime),b=timeOf(t.endTime||t.end||t.endDateTime);if(a===null||b===null||b<=a)return null;out.push({date,from:a,to:b});}continue;}
+        const st=item.startDateTime||item.startTime||item.start,et=item.endDateTime||item.endTime||item.end;
+        const date=dateOf(st)||dateOf(item.date),endDate=dateOf(et)||date;
+        if(!date||!endDate||date!==endDate)return null;
+        const a=timeOf(st),b=timeOf(et);if(a===null||b===null||b<=a)return null;out.push({date,from:a,to:b});
+      }
+      return out;
+    });
+    const graphSupported=computed(()=>lastResponse.value!==null&&normalized.value!==null);
+    const graphRows=computed(()=>{
+      if(!graphSupported.value)return [];
+      const days=[];const a=new Date(start.value+'T12:00:00'),b=new Date(end.value+'T12:00:00');
+      if(Number.isNaN(+a)||Number.isNaN(+b))return [];
+      for(let d=new Date(a),i=0;d<=b&&i<62;d.setDate(d.getDate()+1),i++){
+        const date=iso(d);days.push({date,label:new Intl.DateTimeFormat('nl-NL',{weekday:'short'}).format(d),intervals:normalized.value.filter(x=>x.date===date).map(x=>({...x,label:`${String(Math.floor(x.from/60)).padStart(2,'0')}:${String(x.from%60).padStart(2,'0')}–${String(Math.floor(x.to/60)).padStart(2,'0')}:${String(x.to%60).padStart(2,'0')}`}))});
+      }return days;
+    });
     const base=()=>`https://api.${region.value}`;
     function setStatus(s,isError=false){status.value=s;error.value=isError;}
     function saveConfig(){sessionStorage.setItem('wfm_clientId',clientId.value);sessionStorage.setItem('wfm_region',region.value);}
@@ -76,7 +104,11 @@ createApp({
     async function loadAgents(){
       agents.value=[];agentId.value='';resetAgentData();
       if(!managementUnit.value)return;
-      try{agents.value=await pages(`/api/v2/workforcemanagement/managementunits/${encode(managementUnit.value)}/users`);setStatus(`${agents.value.length} medewerker(s) geladen.`);}
+      try{const list=await pages(`/api/v2/workforcemanagement/managementunits/${encode(managementUnit.value)}/users`);
+        agents.value=list.map(x=>({...x,name:x.name||x.user?.name||x.userName||x.displayName||''}));
+        const unresolved=agents.value.filter(x=>!x.name||x.name===x.id);
+        for(let i=0;i<unresolved.length;i+=8){await Promise.all(unresolved.slice(i,i+8).map(async x=>{try{const u=await api(`/api/v2/users/${encode(x.id)}`);x.name=u.name||u.username||x.id;}catch{x.name=x.id;}}));}
+        agents.value=[...agents.value].sort((a,b)=>(a.name||'').localeCompare(b.name||'','nl'));setStatus(`${agents.value.length} medewerker(s) geladen.`);}
       catch(e){setStatus(e.message,true);}
     }
     async function loadUnavailable(){
@@ -103,6 +135,6 @@ createApp({
     }
     watch([clientId,region],saveConfig);
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');

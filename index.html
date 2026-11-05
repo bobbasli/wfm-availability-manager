@@ -7,31 +7,42 @@
 </head><body class="bg-slate-100 text-slate-800 min-h-screen">
 <div id="app" v-cloak>
 <header class="bg-slate-900 text-white px-5 py-5"><div class="max-w-6xl mx-auto flex flex-wrap justify-between gap-4 items-center">
-<div><h1 class="text-2xl font-bold">WFM Availability Manager <span class="text-sm font-normal text-slate-300">v0.1.1</span></h1><p class="text-sm text-slate-300">Genesys Cloud · Agent Unavailable Times · Vue 3 + Tailwind CSS</p></div>
+<div><h1 class="text-2xl font-bold">WFM Availability Manager <span class="text-sm font-normal text-slate-300">v0.1.2</span></h1><p class="text-sm text-slate-300">Genesys Cloud · Agent Unavailable Times · Vue 3 + Tailwind CSS</p></div>
 <div class="flex items-center gap-3"><span class="text-sm">{{ identity }}</span><button v-if="!token" @click="login" class="bg-indigo-500 hover:bg-indigo-600 rounded-lg px-4 py-2">Aanmelden</button><button v-else @click="logout" class="bg-slate-700 rounded-lg px-4 py-2">Afmelden</button></div>
 </div></header>
 <main class="max-w-6xl mx-auto p-4 md:p-6 space-y-5">
-<section class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-4">1. Verbinding</h2>
+<section v-if="false" class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-4">1. Verbinding</h2>
 <div class="grid md:grid-cols-2 gap-4"><label class="block text-sm font-medium">OAuth Client ID<input v-model.trim="clientId" @change="saveConfig" class="mt-1 w-full border rounded-lg p-2" placeholder="Genesys OAuth Client ID" autocomplete="off"></label>
 <label class="block text-sm font-medium">Regio<select v-model="region" @change="saveConfig" class="mt-1 w-full border rounded-lg p-2"><option value="mypurecloud.de">EU Central 1 (Frankfurt)</option><option value="mypurecloud.ie">EU West 1 (Dublin)</option><option value="mypurecloud.com">US East</option><option value="usw2.pure.cloud">US West</option><option value="mypurecloud.com.au">Sydney</option><option value="mypurecloud.jp">Tokyo</option></select></label></div>
 <p class="text-xs text-slate-500 mt-3">OAuth redirect URI: <code class="break-all">{{ redirect }}</code> · Authorization Code + PKCE · geen client secret</p></section>
-<section class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-4">2. Medewerker selecteren</h2>
+<section class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-4">Medewerker selecteren</h2>
 <div class="grid md:grid-cols-3 gap-4"><label class="block text-sm font-medium">Business Unit<select v-model="businessUnit" @change="loadManagementUnits" :disabled="!token" class="mt-1 w-full border rounded-lg p-2"><option value="">Selecteer Business Unit</option><option v-for="x in businessUnits" :key="x.id" :value="x.id">{{x.name || x.id}}</option></select></label>
 <label class="block text-sm font-medium">Management Unit<select v-model="managementUnit" @change="loadAgents" :disabled="!businessUnit" class="mt-1 w-full border rounded-lg p-2"><option value="">Selecteer Management Unit</option><option v-for="x in managementUnits" :key="x.id" :value="x.id">{{x.name || x.id}}</option></select></label>
 <label class="block text-sm font-medium">Medewerker<select v-model="agentId" @change="resetAgentData" :disabled="!managementUnit" class="mt-1 w-full border rounded-lg p-2"><option value="">Selecteer medewerker</option><option v-for="x in agents" :key="x.id" :value="x.id">{{x.name || x.id}}</option></select></label></div>
 <p class="text-xs text-slate-500 mt-3">Alleen gegevens die je met je Genesys-rechten mag bekijken.</p></section>
-<section class="bg-white rounded-xl shadow-sm p-5"><div class="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 class="text-lg font-semibold">3. Unavailable Times</h2><button @click="loadUnavailable" :disabled="!agentId || busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2">Ophalen / verversen</button></div>
+<section class="bg-white rounded-xl shadow-sm p-5"><div class="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 class="text-lg font-semibold">Unavailable Times</h2><button @click="loadUnavailable" :disabled="!agentId || busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2">Ophalen / verversen</button></div>
 <div class="grid md:grid-cols-2 gap-4"><label class="text-sm font-medium">Vanaf<input type="date" v-model="start" class="mt-1 w-full border rounded-lg p-2"></label><label class="text-sm font-medium">Tot en met<input type="date" v-model="end" class="mt-1 w-full border rounded-lg p-2"></label></div>
 <details class="mt-4"><summary class="cursor-pointer text-sm font-semibold">Geavanceerd: query-body (JSON)</summary><textarea v-model="queryBody" rows="6" spellcheck="false" class="mt-2 w-full border rounded-lg p-3 text-xs"></textarea><p class="text-xs text-slate-500">Gebruik {{'{{start}}'}} en {{'{{end}}'}} als datum-placeholders.</p></details>
-<div class="mt-4"><p v-if="!lastResponse" class="bg-slate-50 rounded-lg p-4 text-slate-500 text-sm">Selecteer een medewerker en klik op Ophalen.</p>
-<template v-else><div v-if="!records.length" class="bg-slate-50 rounded-lg p-4 text-sm">Geen herkenbare tijdvakken gevonden. Controleer de ruwe API-response.</div>
-<div v-else class="space-y-2"><pre v-for="(item,i) in records" :key="i" class="bg-slate-50 border rounded-lg p-3 text-xs whitespace-pre-wrap break-all">{{ JSON.stringify(item,null,2) }}</pre></div></template></div></section>
-<section class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-2">4. Technische PATCH-editor (testversie)</h2>
+<div class="mt-5">
+<p v-if="!lastResponse" class="bg-slate-50 rounded-lg p-4 text-slate-500 text-sm">Selecteer een medewerker en klik op Ophalen.</p>
+<template v-else>
+<div v-if="!graphSupported" class="border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-4 text-sm">De API-response is opgehaald, maar de tijdvakken kunnen nog niet betrouwbaar grafisch worden geïnterpreteerd. Bekijk de technische API-response onderaan. Er worden geen aannames gemaakt over beschikbaarheid.</div>
+<template v-else>
+<div class="flex flex-wrap justify-between gap-3 items-center mb-3"><h3 class="font-semibold">Niet-beschikbare tijdvakken</h3><span class="text-xs text-slate-500">{{graphRows.length}} dagen · rood = niet beschikbaar · wit = geen opgegeven tijdvak</span></div>
+<div class="overflow-x-auto"><div class="min-w-[620px]">
+<div class="flex items-end gap-3 mb-2"><div class="w-28 shrink-0"></div><div class="flex-1 flex justify-between text-xs text-slate-500"><span v-for="h in [0,4,8,12,16,20,24]" :key="h">{{String(h).padStart(2,'0')}}:00</span></div></div>
+<div v-for="day in graphRows" :key="day.date" class="flex gap-3 items-center py-2 border-t border-slate-100"><div class="w-28 shrink-0"><div class="text-sm font-medium">{{day.label}}</div><div class="text-xs text-slate-500">{{day.date}}</div></div>
+<div class="relative flex-1 h-9 rounded-md bg-slate-100 overflow-hidden" :title="day.intervals.length ? day.intervals.map(x=>x.label).join(', ') : 'Geen opgegeven unavailable times'">
+<div v-for="(slot,i) in day.intervals" :key="i" class="absolute top-1 bottom-1 bg-rose-500 rounded-sm" :style="{left:(slot.from/1440*100)+'%',width:((slot.to-slot.from)/1440*100)+'%'}" :title="slot.label"></div></div>
+<div class="w-36 shrink-0 text-xs text-slate-600 text-right">{{day.intervals.map(x=>x.label).join(', ') || '—'}}</div></div></div></div>
+<p class="text-xs text-slate-500 mt-3">Wit betekent alleen dat er geen niet-beschikbaar tijdvak is opgegeven; het is geen bevestiging dat de medewerker ingeroosterd kan worden.</p>
+</template></template></div></section>
+<section class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-2">Technische PATCH-editor (testversie)</h2>
 <p class="text-sm text-slate-600 mb-4">Er wordt uitsluitend de JSON verstuurd die je hier zelf invult. Er worden geen automatische wijzigingen gemaakt. Test eerst met een testagent.</p>
 <label class="text-sm font-medium">PATCH Request Body<textarea v-model="patchBody" @input="confirmed=false" rows="9" spellcheck="false" placeholder="Plak hier een geldige PATCH-body uit Genesys API Explorer" class="mt-1 w-full border rounded-lg p-3 text-xs"></textarea></label>
 <div class="flex flex-wrap justify-between items-center gap-3 mt-3"><label class="text-sm flex gap-2 items-center"><input type="checkbox" v-model="confirmed"> Ik heb de JSON gecontroleerd en wil deze wijziging uitvoeren.</label>
 <button @click="savePatch" :disabled="!token || !agentId || !confirmed || !patchBody.trim() || busy" class="bg-rose-700 text-white rounded-lg px-4 py-2">PATCH uitvoeren</button></div>
 <p class="text-xs text-slate-500 mt-3">Wijzigingen in Unavailable Times passen bestaande gepubliceerde roosters niet automatisch aan.</p></section>
 <section class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-3">API-diagnose</h2><div role="status" :class="error ? 'text-rose-700' : 'text-slate-700'" class="text-sm">{{status}}</div><details class="mt-3"><summary class="cursor-pointer text-sm font-semibold">Laatste API-response</summary><pre class="bg-slate-50 border rounded-lg p-3 mt-2 text-xs whitespace-pre-wrap break-all">{{raw}}</pre></details></section>
-</main><footer class="text-center text-xs text-slate-500 py-6">WFM Availability Manager v0.1.1 · Prototype · Geen eigen backend</footer>
+</main><footer class="text-center text-xs text-slate-500 py-6">WFM Availability Manager v0.1.2 · Prototype · Geen eigen backend</footer>
 </div><script type="module" src="./app.js"></script></body></html>
