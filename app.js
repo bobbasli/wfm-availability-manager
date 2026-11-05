@@ -22,13 +22,33 @@ createApp({
     const scheduleData=ref(null),scheduleError=ref(''),scheduleBusy=ref(false);
     const scheduleCandidates=ref([]),selectedSchedule=ref(''),scheduleDiagnostics=ref(null);
     const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
+    const activityCodes=ref([]),activityCodeError=ref('');
+    const activityCodeMap=computed(()=>new Map(activityCodes.value.map(c=>[String(c.id),c])));
+    function codeColor(code){
+      const raw=code?.color?.hex||code?.color?.value||code?.color?.code||code?.color||code?.hexColor||code?.colorCode||code?.backgroundColor;
+      if(typeof raw!=='string')return null;
+      const color=raw.trim();
+      if(/^#[0-9a-f]{3}([0-9a-f]{3})?([0-9a-f]{2})?$/i.test(color))return color;
+      if(/^[0-9a-f]{6}$/i.test(color))return '#'+color;
+      if(/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(color))return color;
+      return null;
+    }
+    async function loadActivityCodes(){
+      activityCodes.value=[];activityCodeError.value='';
+      const mu=managementUnit.value;if(!mu||!token.value)return;
+      try{
+        const data=await api(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/activitycodes`);
+        if(mu!==managementUnit.value)return;
+        activityCodes.value=Array.isArray(data)?data:(data.entities||data.activityCodes||data.results||data.items||[]);
+      }catch(e){if(mu===managementUnit.value)activityCodeError.value=`Activity Codes konden niet worden opgehaald: ${e.message}`;}
+    }
     const scheduleSegments=computed(()=>{
       const root=scheduleData.value;if(!root)return [];
       // Genesys returns completed schedule queries under result.agentSchedules.
       const payload=root.result||root;
       const rows=Array.isArray(payload)?payload:(payload.agentSchedules||payload.entities||payload.results||payload.items||payload.schedules||[]);
       const segments=[];
-      function addSpan(span,label){
+      function addSpan(span,label,color=null,kind='shift'){
         if(!span)return;
         const from=span.startDate||span.startTime||span.start||span.startDateTime;
         const to=span.endDate||span.endTime||span.end||span.endDateTime;
@@ -39,7 +59,7 @@ createApp({
         for(let ms=t;ms<endMs;ms+=60000){
           const loc=localParts(ms);
           if(!current||current.date!==loc.date||loc.minute!==current.lastMinute+1){
-            current={date:loc.date,from:loc.minute,to:loc.minute+1,lastMinute:loc.minute,label};segments.push(current);
+            current={date:loc.date,from:loc.minute,to:loc.minute+1,lastMinute:loc.minute,label,color,kind};segments.push(current);
           }else{current.to=loc.minute+1;current.lastMinute=loc.minute;}
         }
       }
@@ -49,10 +69,15 @@ createApp({
         const shifts=r.shifts||r.shiftAssignments||r.scheduledShifts||r.shiftSegments||[];
         for(const shift of shifts){
           const span=shift.timeSpan||shift;
-          addSpan(span,shift.name||shift.activityCode?.name||'Roosterdienst');
+          addSpan(span,shift.name||shift.activityCode?.name||'Roosterdienst',null,'shift');
+          for(const activity of (shift.activities||[])){
+            const code=activityCodeMap.value.get(String(activity.activityCodeId??activity.activityCode?.id??''));
+            const name=code?.name||code?.description||activity.activityCode?.name||activity.description||`Activity Code ${activity.activityCodeId??'onbekend'}`;
+            addSpan(activity,name,codeColor(code),'activity');
+          }
         }
       }
-      return segments.map(x=>({...x,label:`${fmt(x.from)}–${fmt(x.to)} · ${x.label}`}));
+      return segments.map(x=>({...x,label:`${x.label} · ${fmt(x.from)}–${fmt(x.to)}`}));
     });
     function scheduleWeekId(s){
       // Read the actual Genesys schedule object, even when wrapped by an earlier UI model.
@@ -77,6 +102,7 @@ createApp({
       if(!businessUnit.value||!agentId.value)return;
       const bu=businessUnit.value,agent=agentId.value,mu=managementUnit.value;
       scheduleBusy.value=true;scheduleState.value='Gepubliceerde roosters zoeken…';
+      loadActivityCodes();
       try{
         const response=await api(`/api/v2/workforcemanagement/businessunits/${encode(bu)}/weeks/recent/schedules`);
         if(bu!==businessUnit.value||agent!==agentId.value||mu!==managementUnit.value)return;
@@ -113,7 +139,7 @@ createApp({
       }catch(e){scheduleError.value=e.message;scheduleState.value='Rooster ophalen mislukt.';}
       finally{scheduleBusy.value=false;}
     }
-    const scheduleRows=computed(()=>graphRows.value.map(day=>({...day,shifts:scheduleSegments.value.filter(x=>x.date===day.date)})));
+    const scheduleRows=computed(()=>graphRows.value.map(day=>({...day,shifts:scheduleSegments.value.filter(x=>x.date===day.date&&x.kind==='shift'),activities:scheduleSegments.value.filter(x=>x.date===day.date&&x.kind==='activity')})));
     const records=computed(()=>{const d=lastResponse.value;if(!d)return [];return Array.isArray(d)?d:(d.entities||d.unavailableTimes||d.results||d.items||d.days||[]);});
     // Interpret Genesys timeSpan.startDate as UTC and split at Dutch local midnight.
     const tz='Europe/Amsterdam';
@@ -253,7 +279,7 @@ createApp({
       catch(e){setStatus(e.message,true);}finally{busy.value=false;}
     }
     function logout(){token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
-    function resetAgentData(){lastResponse.value=null;scheduleData.value=null;scheduleError.value='';scheduleCandidates.value=[];selectedSchedule.value='';scheduleDiagnostics.value=null;confirmed.value=false;closeEditor();if(agentId.value){loadUnavailable();discoverSchedules();}}
+    function resetAgentData(){lastResponse.value=null;scheduleData.value=null;scheduleError.value='';scheduleCandidates.value=[];selectedSchedule.value='';scheduleDiagnostics.value=null;activityCodes.value=[];activityCodeError.value='';confirmed.value=false;closeEditor();if(agentId.value){loadUnavailable();discoverSchedules();}}
     async function loadManagementUnits(){
       managementUnit.value='';managementUnits.value=[];agents.value=[];agentId.value='';resetAgentData();
       if(!businessUnit.value)return;
@@ -295,6 +321,6 @@ createApp({
     watch([clientId,region],saveConfig);
     watch([start,end],()=>{if(agentId.value){loadUnavailable();discoverSchedules();}});
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');

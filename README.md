@@ -26,3 +26,12 @@ Test with a test user before use. OAuth configuration remains as in v0.1.8.
 - Genesys Cloud-inspired header gradient using Tailwind utility classes (#3d538f → #263b73 → #152550).
 - Header button styling and keyboard focus color #5476d5.
 - No changes to schedule API or availability editing logic.
+
+
+## v0.1.9.5 — Activity Codes
+- GET /api/v2/workforcemanagement/managementunits/{managementUnitId}/activitycodes bij roosterzoeken.
+- Roosteractiviteiten uit `result.agentSchedules[].shifts[].activities`, met kleuren en namen uit de Activity Codes.
+- Hover op activiteit toont naam en lokale begin-/eindtijd.
+- Bij ontbrekende kleur blijft de dienst groen; er worden geen fictieve kleuren gebruikt.
+- Activity Code-fouten zijn niet fataal voor de bestaande roosterweergave.
+- Alleen-lezen voor rooster, Unavailable Times-editor onveranderd.
