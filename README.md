@@ -1,4 +1,4 @@
-# WFM Availability Manager v0.1.3
+# WFM Availability Manager v0.1.4
 
 Correctie van de Vue-rendering: gebruikt expliciet de Vue 3 ESM browserbuild inclusief templatecompiler. Het verbindingsblok is verwijderd. Medewerkersnamen en grafische Unavailable Times-weergave zijn behouden.
 
@@ -13,3 +13,7 @@ De OAuth Client ID en regio worden uit bestaande sessionStorage-instellingen gel
 - Query/PATCH JSON moet nog met echte Genesys-responses worden gevalideerd.
 - Grafische weergave toont alleen herkenbare tijdvakken en is nog niet bewerkbaar.
 - Niet live getest in de Genesys-organisatie.
+
+## Fix v0.1.4
+- Ongeldige geneste Vue-interpolaties in de HTML vervangen door `v-pre` placeholders. Dit voorkwam templatecompilatie.
+- Nog niet live getest in de Genesys-omgeving.

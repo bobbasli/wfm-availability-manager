@@ -8,7 +8,7 @@
 </head><body class="bg-slate-100 text-slate-800 min-h-screen">
 <div id="app" v-cloak>
 <header class="bg-slate-900 text-white px-5 py-5"><div class="max-w-6xl mx-auto flex flex-wrap justify-between gap-4 items-center">
-<div><h1 class="text-2xl font-bold">WFM Availability Manager <span class="text-sm font-normal text-slate-300">v0.1.3</span></h1><p class="text-sm text-slate-300">Genesys Cloud · Agent Unavailable Times · Vue 3 + Tailwind CSS</p></div>
+<div><h1 class="text-2xl font-bold">WFM Availability Manager <span class="text-sm font-normal text-slate-300">v0.1.4</span></h1><p class="text-sm text-slate-300">Genesys Cloud · Agent Unavailable Times · Vue 3 + Tailwind CSS</p></div>
 <div class="flex items-center gap-3"><span class="text-sm">{{ identity }}</span><button v-if="!token" @click="login" class="bg-indigo-500 hover:bg-indigo-600 rounded-lg px-4 py-2">Aanmelden</button><button v-else @click="logout" class="bg-slate-700 rounded-lg px-4 py-2">Afmelden</button></div>
 </div></header>
 <main class="max-w-6xl mx-auto p-4 md:p-6 space-y-5">
@@ -19,7 +19,7 @@
 <p class="text-xs text-slate-500 mt-3">Alleen gegevens die je met je Genesys-rechten mag bekijken.</p></section>
 <section class="bg-white rounded-xl shadow-sm p-5"><div class="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 class="text-lg font-semibold">Unavailable Times</h2><button @click="loadUnavailable" :disabled="!agentId || busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2">Ophalen / verversen</button></div>
 <div class="grid md:grid-cols-2 gap-4"><label class="text-sm font-medium">Vanaf<input type="date" v-model="start" class="mt-1 w-full border rounded-lg p-2"></label><label class="text-sm font-medium">Tot en met<input type="date" v-model="end" class="mt-1 w-full border rounded-lg p-2"></label></div>
-<details class="mt-4"><summary class="cursor-pointer text-sm font-semibold">Geavanceerd: query-body (JSON)</summary><textarea v-model="queryBody" rows="6" spellcheck="false" class="mt-2 w-full border rounded-lg p-3 text-xs"></textarea><p class="text-xs text-slate-500">Gebruik {{'{{start}}'}} en {{'{{end}}'}} als datum-placeholders.</p></details>
+<details class="mt-4"><summary class="cursor-pointer text-sm font-semibold">Geavanceerd: query-body (JSON)</summary><textarea v-model="queryBody" rows="6" spellcheck="false" class="mt-2 w-full border rounded-lg p-3 text-xs"></textarea><p class="text-xs text-slate-500">Gebruik <code v-pre>{{start}}</code> en <code v-pre>{{end}}</code> als datum-placeholders.</p></details>
 <div class="mt-5">
 <p v-if="!lastResponse" class="bg-slate-50 rounded-lg p-4 text-slate-500 text-sm">Selecteer een medewerker en klik op Ophalen.</p>
 <template v-else>
@@ -41,5 +41,5 @@
 <button @click="savePatch" :disabled="!token || !agentId || !confirmed || !patchBody.trim() || busy" class="bg-rose-700 text-white rounded-lg px-4 py-2">PATCH uitvoeren</button></div>
 <p class="text-xs text-slate-500 mt-3">Wijzigingen in Unavailable Times passen bestaande gepubliceerde roosters niet automatisch aan.</p></section>
 <section class="bg-white rounded-xl shadow-sm p-5"><h2 class="text-lg font-semibold mb-3">API-diagnose</h2><div role="status" :class="error ? 'text-rose-700' : 'text-slate-700'" class="text-sm">{{status}}</div><details class="mt-3"><summary class="cursor-pointer text-sm font-semibold">Laatste API-response</summary><pre class="bg-slate-50 border rounded-lg p-3 mt-2 text-xs whitespace-pre-wrap break-all">{{raw}}</pre></details></section>
-</main><footer class="text-center text-xs text-slate-500 py-6">WFM Availability Manager v0.1.3 · Prototype · Geen eigen backend</footer>
+</main><footer class="text-center text-xs text-slate-500 py-6">WFM Availability Manager v0.1.4 · Prototype · Geen eigen backend</footer>
 </div><script type="module" src="./app.js"></script></body></html>
