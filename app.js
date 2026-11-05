@@ -52,9 +52,15 @@ createApp({
       return segments.map(x=>({...x,label:`${fmt(x.from)}–${fmt(x.to)} · ${x.label}`}));
     });
     function scheduleWeekId(s){
-      // Genesys uses weekDate (YYYY-MM-DD) as the week path parameter.
-      // Do not use the discovery alias "recent" in metadata/query requests.
-      return s.weekId || s.weekDate || s.week?.weekDate || s.week?.id || null;
+      // Read the actual Genesys schedule object, even when wrapped by an earlier UI model.
+      const candidates=[s?.weekDate,s?.raw?.weekDate,s?.weekId,s?.raw?.weekId,s?.week?.weekDate,s?.raw?.week?.weekDate];
+      for(const value of candidates){if(typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value))return value;}
+      // Genesys also provides the canonical week date in the schedule selfUri.
+      for(const uri of [s?.selfUri,s?.raw?.selfUri]){
+        const match=typeof uri==='string'&&uri.match(/\/weeks\/(\d{4}-\d{2}-\d{2})\/schedules\//);
+        if(match)return match[1];
+      }
+      return null;
     }
     function schedulePublished(s){
       const flag=s.published??s.isPublished??s.publicationStatus;
@@ -89,14 +95,16 @@ createApp({
       const bu=businessUnit.value,mu=managementUnit.value,agent=agentId.value;
       scheduleBusy.value=true;scheduleState.value='Rooster en metadata ophalen…';
       try{
-        if(!candidate.weekId)throw Error('Het rooster bevat geen Week-ID. Bekijk de API-diagnose; er wordt geen Week-ID geraden.');
-        const prefix=`/api/v2/workforcemanagement/businessunits/${encode(bu)}/weeks/${encode(candidate.weekId)}/schedules/${encode(candidate.id)}`;
+        const resolvedWeekId=scheduleWeekId(candidate);
+        if(!resolvedWeekId)throw Error('Geen weekdatum in weekDate of selfUri van dit rooster. Controleer de Rooster API-diagnose.');
+        candidate.weekId=resolvedWeekId;
+        const prefix=`/api/v2/workforcemanagement/businessunits/${encode(bu)}/weeks/${encode(resolvedWeekId)}/schedules/${encode(candidate.id)}`;
         const metadata=await api(prefix);
         if(bu!==businessUnit.value||mu!==managementUnit.value||agent!==agentId.value)return;
-        scheduleDiagnostics.value={schedule:candidate.raw,metadata};
+        scheduleDiagnostics.value={schedule:candidate.raw,resolvedWeekId,metadata};
         const result=await api(`${prefix}/agentschedules/query`,'POST',{managementUnitId:mu,userIds:[agent],teamIds:[]});
         if(bu!==businessUnit.value||mu!==managementUnit.value||agent!==agentId.value)return;
-        scheduleData.value=result;scheduleDiagnostics.value={schedule:candidate.raw,metadata,response:result};
+        scheduleData.value=result;scheduleDiagnostics.value={schedule:candidate.raw,resolvedWeekId,metadata,response:result};
         scheduleState.value=scheduleSegments.value.length?'Rooster geladen.':'Rooster opgehaald; diensttijden nog niet herkend. Bekijk de diagnose.';
       }catch(e){scheduleError.value=e.message;scheduleState.value='Rooster ophalen mislukt.';}
       finally{scheduleBusy.value=false;}

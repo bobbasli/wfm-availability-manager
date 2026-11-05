@@ -1,3 +1,7 @@
+WFM Availability Manager v0.1.9.3
+
+Fix: robust Week-ID resolution from Genesys weekDate or canonical selfUri, including nested raw objects; metadata/query use resolved value. Cache-busted app.js URL. Read-only schedule unchanged; unavailable times editor unchanged.
+
 # WFM Availability Manager v0.1.9.2
 
 Vue 3 + Tailwind CSS prototype for Genesys Cloud (EU Central). Deploy `index.html` and `app.js` together on GitHub Pages.
