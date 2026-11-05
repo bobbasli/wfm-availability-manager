@@ -18,36 +18,86 @@ createApp({
     const queryBody=ref('');
     const patchBody=ref(''),confirmed=ref(false),lastResponse=ref(null),raw=ref('Nog geen response.');
     const status=ref('Klaar.'),error=ref(false),busy=ref(false);
-    // Read-only schedule exploration. No schedule write endpoint is used.
+    // Published schedules are read-only. Never use schedule mutation endpoints.
     const scheduleData=ref(null),scheduleError=ref(''),scheduleBusy=ref(false);
+    const scheduleCandidates=ref([]),selectedSchedule=ref(''),scheduleDiagnostics=ref(null);
+    const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
     const scheduleSegments=computed(()=>{
       const root=scheduleData.value;if(!root)return [];
-      const rows=Array.isArray(root)?root:(root.entities||root.agentSchedules||root.schedules||root.results||[]);
+      const rows=Array.isArray(root)?root:(root.entities||root.agentSchedules||root.results||root.items||root.schedules||[]);
       const segments=[];
-      for(const r of rows){
-        const shifts=r.shifts||r.shiftAssignments||r.scheduledShifts||[];
-        for(const s of shifts){
-          const span=s.timeSpan||s;const startValue=span.startDate||span.startTime;const endValue=span.endDate||span.endTime;
-          const t=Date.parse(startValue);const endMs=endValue?Date.parse(endValue):t+Number(span.lengthMinutes)*60000;
-          if(!Number.isFinite(t)||!Number.isFinite(endMs)||endMs<=t)continue;
-          const parts=localParts(t),endParts=localParts(endMs);
-          if(parts.date===endParts.date)segments.push({date:parts.date,from:parts.minute,to:endParts.minute,label:`${fmt(parts.minute)}–${fmt(endParts.minute)}`});
+      function addSpan(span,label){
+        if(!span)return;
+        const from=span.startDate||span.startTime||span.start||span.startDateTime;
+        const to=span.endDate||span.endTime||span.end||span.endDateTime;
+        const t=Date.parse(from),endMs=to?Date.parse(to):t+Number(span.lengthMinutes)*60000;
+        if(!Number.isFinite(t)||!Number.isFinite(endMs)||endMs<=t)return;
+        // Split across Dutch midnight and DST transitions, same as unavailable times.
+        let current=null;
+        for(let ms=t;ms<endMs;ms+=60000){
+          const loc=localParts(ms);
+          if(!current||current.date!==loc.date||loc.minute!==current.lastMinute+1){
+            current={date:loc.date,from:loc.minute,to:loc.minute+1,lastMinute:loc.minute,label};segments.push(current);
+          }else{current.to=loc.minute+1;current.lastMinute=loc.minute;}
         }
       }
-      return segments;
+      for(const r of rows){
+        if(r.userId&&r.userId!==agentId.value)continue;
+        const shifts=r.shifts||r.shiftAssignments||r.scheduledShifts||r.shiftSegments||[];
+        for(const shift of shifts){
+          const span=shift.timeSpan||shift;
+          addSpan(span,shift.name||shift.activityCode?.name||'Roosterdienst');
+        }
+      }
+      return segments.map(x=>({...x,label:`${fmt(x.from)}–${fmt(x.to)} · ${x.label}`}));
     });
-    async function loadSchedule(){
-      scheduleData.value=null;scheduleError.value='';
-      if(!agentId.value||!managementUnit.value)return;
-      const selectedAgent=agentId.value,selectedMu=managementUnit.value;
-      scheduleBusy.value=true;
+    function scheduleWeekId(s){return s.weekId||s.week?.id||null;}
+    function schedulePublished(s){
+      const flag=s.published??s.isPublished??s.publicationStatus;
+      if(flag===true)return true;
+      if(typeof flag==='string'&&/published/i.test(flag))return true;
+      if(s.status&&/published/i.test(s.status))return true;
+      return false;
+    }
+    async function discoverSchedules(){
+      scheduleCandidates.value=[];selectedSchedule.value='';scheduleData.value=null;scheduleError.value='';
+      if(!businessUnit.value||!agentId.value)return;
+      const bu=businessUnit.value,agent=agentId.value,mu=managementUnit.value;
+      scheduleBusy.value=true;scheduleState.value='Gepubliceerde roosters zoeken…';
       try{
-        const d=await api(`/api/v2/workforcemanagement/managementunits/${encode(selectedMu)}/agents/${encode(selectedAgent)}/schedules`);
-        if(agentId.value===selectedAgent&&managementUnit.value===selectedMu)scheduleData.value=d;
-      }catch(e){if(agentId.value===selectedAgent)scheduleError.value=e.message;}
+        const response=await api(`/api/v2/workforcemanagement/businessunits/${encode(bu)}/weeks/recent/schedules`);
+        if(bu!==businessUnit.value||agent!==agentId.value||mu!==managementUnit.value)return;
+        const items=Array.isArray(response)?response:(response.entities||response.schedules||response.results||response.items||[]);
+        const eligible=items.filter(x=>x.id&&schedulePublished(x));
+        // 'recent' is a discovery alias, not a guaranteed valid weekId for metadata/query.
+        // Some list responses do not contain weekId; show a diagnostic rather than guessing.
+        scheduleCandidates.value=eligible.map(x=>({id:x.id,weekId:scheduleWeekId(x),name:x.name||x.description||'Gepubliceerd rooster',raw:x}));
+        if(!eligible.length){scheduleState.value='Geen expliciet gepubliceerd rooster gevonden voor deze Business Unit.';return;}
+        if(eligible.length===1){selectedSchedule.value=eligible[0].id;await loadSchedule();}
+        else scheduleState.value=`${eligible.length} gepubliceerde roosters gevonden. Kies het rooster voor deze week.`;
+      }catch(e){scheduleError.value=e.message;scheduleState.value='Rooster ophalen mislukt.';}
       finally{scheduleBusy.value=false;}
     }
-    const scheduleRows=computed(()=>graphRows.value.map(day=>({...day,shifts:scheduleSegments.value.filter(s=>s.date===day.date)})));
+    async function loadSchedule(){
+      scheduleData.value=null;scheduleError.value='';
+      const candidate=scheduleCandidates.value.find(x=>x.id===selectedSchedule.value);
+      if(!candidate||!businessUnit.value||!managementUnit.value||!agentId.value)return;
+      const bu=businessUnit.value,mu=managementUnit.value,agent=agentId.value;
+      scheduleBusy.value=true;scheduleState.value='Rooster en metadata ophalen…';
+      try{
+        if(!candidate.weekId)throw Error('Het rooster bevat geen Week-ID. Bekijk de API-diagnose; er wordt geen Week-ID geraden.');
+        const prefix=`/api/v2/workforcemanagement/businessunits/${encode(bu)}/weeks/${encode(candidate.weekId)}/schedules/${encode(candidate.id)}`;
+        const metadata=await api(prefix);
+        if(bu!==businessUnit.value||mu!==managementUnit.value||agent!==agentId.value)return;
+        scheduleDiagnostics.value={schedule:candidate.raw,metadata};
+        const result=await api(`${prefix}/agentschedules/query`,'POST',{managementUnitId:mu,userIds:[agent],teamIds:[]});
+        if(bu!==businessUnit.value||mu!==managementUnit.value||agent!==agentId.value)return;
+        scheduleData.value=result;scheduleDiagnostics.value={schedule:candidate.raw,metadata,response:result};
+        scheduleState.value=scheduleSegments.value.length?'Rooster geladen.':'Rooster opgehaald; diensttijden nog niet herkend. Bekijk de diagnose.';
+      }catch(e){scheduleError.value=e.message;scheduleState.value='Rooster ophalen mislukt.';}
+      finally{scheduleBusy.value=false;}
+    }
+    const scheduleRows=computed(()=>graphRows.value.map(day=>({...day,shifts:scheduleSegments.value.filter(x=>x.date===day.date)})));
     const records=computed(()=>{const d=lastResponse.value;if(!d)return [];return Array.isArray(d)?d:(d.entities||d.unavailableTimes||d.results||d.items||d.days||[]);});
     // Interpret Genesys timeSpan.startDate as UTC and split at Dutch local midnight.
     const tz='Europe/Amsterdam';
@@ -187,7 +237,7 @@ createApp({
       catch(e){setStatus(e.message,true);}finally{busy.value=false;}
     }
     function logout(){token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
-    function resetAgentData(){lastResponse.value=null;scheduleData.value=null;scheduleError.value='';confirmed.value=false;closeEditor();if(agentId.value){loadUnavailable();loadSchedule();}}
+    function resetAgentData(){lastResponse.value=null;scheduleData.value=null;scheduleError.value='';scheduleCandidates.value=[];selectedSchedule.value='';scheduleDiagnostics.value=null;confirmed.value=false;closeEditor();if(agentId.value){loadUnavailable();discoverSchedules();}}
     async function loadManagementUnits(){
       managementUnit.value='';managementUnits.value=[];agents.value=[];agentId.value='';resetAgentData();
       if(!businessUnit.value)return;
@@ -227,8 +277,8 @@ createApp({
       }catch(e){setStatus(e.message,true);}finally{busy.value=false;}
     }
     watch([clientId,region],saveConfig);
-    watch([start,end],()=>{if(agentId.value){loadUnavailable();loadSchedule();}});
+    watch([start,end],()=>{if(agentId.value){loadUnavailable();discoverSchedules();}});
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');

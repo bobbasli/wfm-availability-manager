@@ -1,14 +1,15 @@
-# WFM Availability Manager v0.1.8
+# WFM Availability Manager v0.1.9
 
-Gebaseerd op werkende v0.1.7. Behoudt bewerken/toevoegen/verwijderen van Unavailable Times.
+Vue 3 + Tailwind CSS prototype for Genesys Cloud (EU Central). Deploy `index.html` and `app.js` together on GitHub Pages.
 
-## Nieuw
-- Read-only roosterpaneel met GET `/api/v2/workforcemanagement/managementunits/{managementUnitId}/agents/{agentId}/schedules`.
-- Beperkte herkenning van roosterdiensten; ruwe API-response voor verificatie.
-- Fouten bij rooster-API hebben geen invloed op de bestaande Unavailable Times-editor.
-- Work Plan is nog niet gekoppeld; geen onbevestigde dagdienst tonen.
+## New
+- Unified daily timeline: editable red Unavailable Times and read-only green published schedule segments.
+- Schedule discovery via `GET /api/v2/workforcemanagement/businessunits/{businessUnitId}/weeks/recent/schedules`.
+- Metadata via `GET /api/v2/workforcemanagement/businessunits/{businessUnitId}/weeks/{weekId}/schedules/{scheduleId}`.
+- Agent schedule via `POST .../agentschedules/query` with `{managementUnitId,userIds:[agentId],teamIds:[]}`.
+- Multiple published schedules require explicit selection. No schedule write endpoints are used.
 
-## Test
-Publiceer `index.html` en `app.js` in GitHub Pages. Selecteer BU, MU en medewerker. Test Unavailable Times zoals voorheen. Controleer daarna het read-only roosterpaneel en de diagnose. Deel de roosterresponse voor een precieze koppeling en Work Plan-toewijzing.
+## Important
+The actual schedule response shape and week IDs have not been verified against a live Genesys environment. If the schedule list lacks a weekId or the response has an unexpected shape, the application shows a diagnostic instead of inventing a schedule. Work Plan integration is not yet implemented.
 
-Geen live Genesys-test uitgevoerd.
+Test with a test user before use. OAuth configuration remains as in v0.1.8.
