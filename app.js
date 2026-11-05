@@ -6,7 +6,7 @@ const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 const monday = new Date(); monday.setDate(monday.getDate() - (monday.getDay()+6)%7);
 const until = new Date(monday); until.setDate(until.getDate()+27);
 const encode = encodeURIComponent;
-function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');}
+function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 createApp({
   setup(){
     const clientId=ref(qs.get('clientId')||sessionStorage.getItem('wfm_clientId')||'');
