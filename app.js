@@ -18,6 +18,36 @@ createApp({
     const queryBody=ref('');
     const patchBody=ref(''),confirmed=ref(false),lastResponse=ref(null),raw=ref('Nog geen response.');
     const status=ref('Klaar.'),error=ref(false),busy=ref(false);
+    // Read-only schedule exploration. No schedule write endpoint is used.
+    const scheduleData=ref(null),scheduleError=ref(''),scheduleBusy=ref(false);
+    const scheduleSegments=computed(()=>{
+      const root=scheduleData.value;if(!root)return [];
+      const rows=Array.isArray(root)?root:(root.entities||root.agentSchedules||root.schedules||root.results||[]);
+      const segments=[];
+      for(const r of rows){
+        const shifts=r.shifts||r.shiftAssignments||r.scheduledShifts||[];
+        for(const s of shifts){
+          const span=s.timeSpan||s;const startValue=span.startDate||span.startTime;const endValue=span.endDate||span.endTime;
+          const t=Date.parse(startValue);const endMs=endValue?Date.parse(endValue):t+Number(span.lengthMinutes)*60000;
+          if(!Number.isFinite(t)||!Number.isFinite(endMs)||endMs<=t)continue;
+          const parts=localParts(t),endParts=localParts(endMs);
+          if(parts.date===endParts.date)segments.push({date:parts.date,from:parts.minute,to:endParts.minute,label:`${fmt(parts.minute)}–${fmt(endParts.minute)}`});
+        }
+      }
+      return segments;
+    });
+    async function loadSchedule(){
+      scheduleData.value=null;scheduleError.value='';
+      if(!agentId.value||!managementUnit.value)return;
+      const selectedAgent=agentId.value,selectedMu=managementUnit.value;
+      scheduleBusy.value=true;
+      try{
+        const d=await api(`/api/v2/workforcemanagement/managementunits/${encode(selectedMu)}/agents/${encode(selectedAgent)}/schedules`);
+        if(agentId.value===selectedAgent&&managementUnit.value===selectedMu)scheduleData.value=d;
+      }catch(e){if(agentId.value===selectedAgent)scheduleError.value=e.message;}
+      finally{scheduleBusy.value=false;}
+    }
+    const scheduleRows=computed(()=>graphRows.value.map(day=>({...day,shifts:scheduleSegments.value.filter(s=>s.date===day.date)})));
     const records=computed(()=>{const d=lastResponse.value;if(!d)return [];return Array.isArray(d)?d:(d.entities||d.unavailableTimes||d.results||d.items||d.days||[]);});
     // Interpret Genesys timeSpan.startDate as UTC and split at Dutch local midnight.
     const tz='Europe/Amsterdam';
@@ -157,7 +187,7 @@ createApp({
       catch(e){setStatus(e.message,true);}finally{busy.value=false;}
     }
     function logout(){token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
-    function resetAgentData(){lastResponse.value=null;confirmed.value=false;closeEditor();if(agentId.value)loadUnavailable();}
+    function resetAgentData(){lastResponse.value=null;scheduleData.value=null;scheduleError.value='';confirmed.value=false;closeEditor();if(agentId.value){loadUnavailable();loadSchedule();}}
     async function loadManagementUnits(){
       managementUnit.value='';managementUnits.value=[];agents.value=[];agentId.value='';resetAgentData();
       if(!businessUnit.value)return;
@@ -197,8 +227,8 @@ createApp({
       }catch(e){setStatus(e.message,true);}finally{busy.value=false;}
     }
     watch([clientId,region],saveConfig);
-    watch([start,end],()=>{if(agentId.value)loadUnavailable();});
+    watch([start,end],()=>{if(agentId.value){loadUnavailable();loadSchedule();}});
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');

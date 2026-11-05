@@ -1,14 +1,14 @@
-# WFM Availability Manager v0.1.7
+# WFM Availability Manager v0.1.8
 
-Gebaseerd op de aangeleverde v0.1.6.
+Gebaseerd op werkende v0.1.7. Behoudt bewerken/toevoegen/verwijderen van Unavailable Times.
 
-## Wijzigingen
-- Datum en tijd in de editor opgesplitst in afzonderlijke native invoervelden, zodat de bestaande waarden correct kunnen worden ingevuld.
-- Expliciete validatiefout bij ongeldige tijden; Opslaan is alleen actief bij een geldige periode.
-- Behoud van UTC-conversie, bestaande registratie-ID en API-gedrag.
-
-## Installatie
-Vervang `index.html` en `app.js` in de root van GitHub Pages en wacht op deployment. Ververs daarna met Ctrl+Shift+R.
+## Nieuw
+- Read-only roosterpaneel met GET `/api/v2/workforcemanagement/managementunits/{managementUnitId}/agents/{agentId}/schedules`.
+- Beperkte herkenning van roosterdiensten; ruwe API-response voor verificatie.
+- Fouten bij rooster-API hebben geen invloed op de bestaande Unavailable Times-editor.
+- Work Plan is nog niet gekoppeld; geen onbevestigde dagdienst tonen.
 
 ## Test
-Controleer eerst een bestaand tijdvak, pas vervolgens een tijdvak aan bij een testmedewerker. De API-bewerking is nog niet live gevalideerd in deze omgeving.
+Publiceer `index.html` en `app.js` in GitHub Pages. Selecteer BU, MU en medewerker. Test Unavailable Times zoals voorheen. Controleer daarna het read-only roosterpaneel en de diagnose. Deel de roosterresponse voor een precieze koppeling en Work Plan-toewijzing.
+
+Geen live Genesys-test uitgevoerd.
