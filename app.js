@@ -1,32 +1,108 @@
-'use strict';
-const $=id=>document.getElementById(id);
-const REDIRECT=location.origin+location.pathname;
-$('redirect').textContent=REDIRECT;
-const params=new URLSearchParams(location.search);
-const config={clientId:params.get('clientId')||sessionStorage.getItem('wfm_clientId')||'',region:params.get('region')||sessionStorage.getItem('wfm_region')||'mypurecloud.de'};
-$('clientId').value=config.clientId;$('region').value=config.region;
-let token=sessionStorage.getItem('wfm_token')||'', agentId='',lastResponse=null;
-function setStatus(message,error=false){$('status').textContent=message;$('status').style.color=error?'#a32635':'#253955'}
-function clearSelect(id,placeholder){$(id).replaceChildren(new Option(placeholder,''));$(id).disabled=true}
-function populate(id,items,placeholder){clearSelect(id,placeholder);for(const x of items)if(x?.id)$(id).add(new Option(x.name||x.id,x.id));$(id).disabled=false}
-function saveConfig(){config.clientId=$('clientId').value.trim();config.region=$('region').value;sessionStorage.setItem('wfm_clientId',config.clientId);sessionStorage.setItem('wfm_region',config.region)}
-$('clientId').addEventListener('change',saveConfig);$('region').addEventListener('change',saveConfig);
-const base=()=>`https://api.${config.region}`;
-function b64url(buffer){return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
-async function login(){saveConfig();if(!config.clientId)return setStatus('Vul eerst een OAuth Client ID in.',true);const verifier=b64url(crypto.getRandomValues(new Uint8Array(32)));const challenge=b64url(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));const state=b64url(crypto.getRandomValues(new Uint8Array(16)));sessionStorage.setItem('wfm_pkce',verifier);sessionStorage.setItem('wfm_state',state);const u=new URL(`https://login.${config.region}/oauth/authorize`);Object.entries({response_type:'code',client_id:config.clientId,redirect_uri:REDIRECT,code_challenge:challenge,code_challenge_method:'S256',state}).forEach(([k,v])=>u.searchParams.set(k,v));location.assign(u.href)}
-async function callback(){const q=new URLSearchParams(location.search);if(q.has('error'))throw Error(`OAuth: ${q.get('error_description')||q.get('error')}`);if(!q.has('code'))return;const state=sessionStorage.getItem('wfm_state');if(!state||q.get('state')!==state)throw Error('OAuth state komt niet overeen.');const verifier=sessionStorage.getItem('wfm_pkce');if(!verifier)throw Error('PKCE verifier ontbreekt.');const r=await fetch(`https://login.${config.region}/oauth/token`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code:q.get('code'),redirect_uri:REDIRECT,client_id:config.clientId,code_verifier:verifier})});const data=await r.json();if(!r.ok)throw Error(JSON.stringify(data));token=data.access_token;sessionStorage.setItem('wfm_token',token);sessionStorage.removeItem('wfm_pkce');sessionStorage.removeItem('wfm_state');history.replaceState({},'',REDIRECT+location.hash)}
-async function api(path,method='GET',body){const r=await fetch(base()+path,{method,headers:{Authorization:`Bearer ${token}`,...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});const t=await r.text();let d;try{d=t?JSON.parse(t):{}}catch{d={raw:t}};$('raw').textContent=JSON.stringify({status:r.status,method,path,response:d},null,2);if(r.status===401){token='';sessionStorage.removeItem('wfm_token');updateLogin()}if(!r.ok)throw Error(`${method} ${path}: HTTP ${r.status} – ${d.message||d.error||t.slice(0,250)}`);return d}
-async function pages(path){let out=[];for(let page=1;page<=50;page++){const u=new URL(path,base());u.searchParams.set('pageSize','100');u.searchParams.set('pageNumber',String(page));const data=await api(u.pathname+u.search);const entries=data.entities||data.results||data.items||[];out.push(...entries);if(!entries.length||entries.length<100||data.pageCount&&page>=data.pageCount)break}return out}
-async function initialize(){updateLogin();if(!token)return;try{const me=await api('/api/v2/users/me');$('identity').textContent=me.name||'Aangemeld';const units=await pages('/api/v2/workforcemanagement/businessunits');populate('bu',units,'Selecteer Business Unit');setStatus(`${units.length} Business Unit(s) geladen.`)}catch(e){setStatus(e.message,true)}}
-function updateLogin(){$('login').hidden=!!token;$('logout').hidden=!token;$('load').disabled=!token||!agentId;$('save').disabled=!token||!agentId||!$('confirm').checked||!$('patchBody').value.trim()}
-$('login').onclick=()=>login().catch(e=>setStatus(e.message,true));$('logout').onclick=()=>{sessionStorage.removeItem('wfm_token');token='';agentId='';$('identity').textContent='Niet aangemeld';['bu','mu','agent'].forEach(id=>clearSelect(id,'Selecteer '+id));updateLogin();setStatus('Afgemeld.')};
-$('bu').onchange=async()=>{clearSelect('mu','Selecteer Management Unit');clearSelect('agent','Selecteer medewerker');agentId='';updateLogin();if(!$('bu').value)return;try{const units=await pages(`/api/v2/workforcemanagement/businessunits/${encodeURIComponent($('bu').value)}/managementunits`);populate('mu',units,'Selecteer Management Unit');setStatus(`${units.length} Management Unit(s) geladen.`)}catch(e){setStatus(e.message,true)}};
-$('mu').onchange=async()=>{clearSelect('agent','Selecteer medewerker');agentId='';updateLogin();if(!$('mu').value)return;try{const data=await pages(`/api/v2/workforcemanagement/managementunits/${encodeURIComponent($('mu').value)}/users`);populate('agent',data,'Selecteer medewerker');setStatus(`${data.length} medewerker(s) geladen.`)}catch(e){setStatus(e.message,true)}};
-$('agent').onchange=()=>{agentId=$('agent').value;lastResponse=null;$('result').textContent='Klik op Ophalen om de Unavailable Times te bekijken.';updateLogin()};
-const today=new Date(),monday=new Date(today);monday.setDate(today.getDate()-(today.getDay()+6)%7);const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;$('start').value=iso(monday);const end=new Date(monday);end.setDate(end.getDate()+27);$('end').value=iso(end);
-$('queryBody').value=JSON.stringify({startDate:'{{start}}',endDate:'{{end}}'},null,2);
-function render(data){const target=$('result');target.replaceChildren();const records=Array.isArray(data)?data:data.entities||data.unavailableTimes||data.results||data.items||data.days||[];if(!records.length){target.className='empty';target.textContent='Geen herkenbare tijdvakken in de response. Bekijk de volledige response onder API-diagnose.';return}target.className='';for(const item of records){const div=document.createElement('div');div.className='entry';div.textContent=JSON.stringify(item,null,2);target.append(div)}}
-$('load').onclick=async()=>{if(!agentId)return;try{if($('end').value<$('start').value)throw Error('Einddatum ligt vóór de begindatum.');const template=$('queryBody').value.replaceAll('{{start}}',$('start').value).replaceAll('{{end}}',$('end').value);const body=JSON.parse(template);setStatus('Unavailable Times ophalen...');lastResponse=await api(`/api/v2/workforcemanagement/agents/${encodeURIComponent(agentId)}/unavailabletimes/query`,'POST',body);render(lastResponse);setStatus('Unavailable Times opgehaald. Controleer de response in API-diagnose.')}catch(e){setStatus(e.message,true)}};
-$('confirm').onchange=updateLogin;$('patchBody').oninput=()=>{$('confirm').checked=false;updateLogin()};
-$('save').onclick=async()=>{if(!token||!agentId||!$('confirm').checked)return;try{const body=JSON.parse($('patchBody').value);if(!confirm(`Weet je zeker dat je de Unavailable Times van ${$('agent').selectedOptions[0]?.textContent} wilt wijzigen?`))return;setStatus('PATCH wordt uitgevoerd...');await api(`/api/v2/workforcemanagement/agents/${encodeURIComponent(agentId)}/unavailabletimes`,'PATCH',body);$('confirm').checked=false;updateLogin();setStatus('PATCH succesvol uitgevoerd. Klik op Ophalen / verversen om de opgeslagen gegevens te controleren.')}catch(e){setStatus(e.message,true)}};
-callback().then(initialize).catch(e=>{setStatus(e.message,true);history.replaceState({},'',REDIRECT+location.hash)});
+import { createApp, ref, computed, onMounted, watch } from 'vue';
+
+const redirect = location.origin + location.pathname;
+const qs = new URLSearchParams(location.search);
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const monday = new Date(); monday.setDate(monday.getDate() - (monday.getDay()+6)%7);
+const until = new Date(monday); until.setDate(until.getDate()+27);
+const encode = encodeURIComponent;
+function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');}
+createApp({
+  setup(){
+    const clientId=ref(qs.get('clientId')||sessionStorage.getItem('wfm_clientId')||'');
+    const region=ref(qs.get('region')||sessionStorage.getItem('wfm_region')||'mypurecloud.de');
+    const token=ref(sessionStorage.getItem('wfm_token')||'');
+    const identity=ref('Niet aangemeld'), businessUnits=ref([]),managementUnits=ref([]),agents=ref([]);
+    const businessUnit=ref(''),managementUnit=ref(''),agentId=ref('');
+    const start=ref(iso(monday)),end=ref(iso(until));
+    const queryBody=ref(JSON.stringify({startDate:'{{start}}',endDate:'{{end}}'},null,2));
+    const patchBody=ref(''),confirmed=ref(false),lastResponse=ref(null),raw=ref('Nog geen response.');
+    const status=ref('Klaar.'),error=ref(false),busy=ref(false);
+    const records=computed(()=>{const d=lastResponse.value;if(!d)return [];return Array.isArray(d)?d:(d.entities||d.unavailableTimes||d.results||d.items||d.days||[]);});
+    const base=()=>`https://api.${region.value}`;
+    function setStatus(s,isError=false){status.value=s;error.value=isError;}
+    function saveConfig(){sessionStorage.setItem('wfm_clientId',clientId.value);sessionStorage.setItem('wfm_region',region.value);}
+    async function login(){
+      saveConfig();if(!clientId.value){setStatus('Vul eerst een OAuth Client ID in.',true);return;}
+      const verifier=b64url(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge=b64url(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
+      const state=b64url(crypto.getRandomValues(new Uint8Array(16)));
+      sessionStorage.setItem('wfm_pkce',verifier);sessionStorage.setItem('wfm_state',state);
+      const url=new URL(`https://login.${region.value}/oauth/authorize`);
+      Object.entries({response_type:'code',client_id:clientId.value,redirect_uri:redirect,code_challenge:challenge,code_challenge_method:'S256',state}).forEach(([k,v])=>url.searchParams.set(k,v));
+      location.assign(url.href);
+    }
+    async function callback(){
+      const q=new URLSearchParams(location.search);
+      if(q.has('error'))throw Error(`OAuth: ${q.get('error_description')||q.get('error')}`);
+      if(!q.has('code'))return;
+      if(!sessionStorage.getItem('wfm_state')||q.get('state')!==sessionStorage.getItem('wfm_state'))throw Error('OAuth state komt niet overeen.');
+      const verifier=sessionStorage.getItem('wfm_pkce');if(!verifier)throw Error('PKCE verifier ontbreekt.');
+      const r=await fetch(`https://login.${region.value}/oauth/token`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code:q.get('code'),redirect_uri:redirect,client_id:clientId.value,code_verifier:verifier})});
+      const d=await r.json();if(!r.ok)throw Error(JSON.stringify(d));
+      token.value=d.access_token;sessionStorage.setItem('wfm_token',token.value);
+      sessionStorage.removeItem('wfm_pkce');sessionStorage.removeItem('wfm_state');
+      history.replaceState({},'',redirect+location.hash);
+    }
+    async function api(path,method='GET',body){
+      const r=await fetch(base()+path,{method,headers:{Authorization:`Bearer ${token.value}`,...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+      const t=await r.text();let d;try{d=t?JSON.parse(t):{};}catch{d={raw:t};}
+      raw.value=JSON.stringify({status:r.status,method,path,response:d},null,2);
+      if(r.status===401){token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';}
+      if(!r.ok)throw Error(`${method} ${path}: HTTP ${r.status} – ${d.message||d.error||t.slice(0,250)}`);
+      return d;
+    }
+    async function pages(path){
+      const out=[];for(let page=1;page<=50;page++){
+        const u=new URL(path,base());u.searchParams.set('pageSize','100');u.searchParams.set('pageNumber',String(page));
+        const d=await api(u.pathname+u.search),items=d.entities||d.results||d.items||[];
+        out.push(...items);if(items.length<100||(d.pageCount&&page>=d.pageCount))break;
+      }return out;
+    }
+    async function initialize(){
+      if(!token.value)return;
+      busy.value=true;
+      try{const me=await api('/api/v2/users/me');identity.value=me.name||'Aangemeld';businessUnits.value=await pages('/api/v2/workforcemanagement/businessunits');setStatus(`${businessUnits.value.length} Business Unit(s) geladen.`);}
+      catch(e){setStatus(e.message,true);}finally{busy.value=false;}
+    }
+    function logout(){token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
+    function resetAgentData(){lastResponse.value=null;confirmed.value=false;}
+    async function loadManagementUnits(){
+      managementUnit.value='';managementUnits.value=[];agents.value=[];agentId.value='';resetAgentData();
+      if(!businessUnit.value)return;
+      try{managementUnits.value=await pages(`/api/v2/workforcemanagement/businessunits/${encode(businessUnit.value)}/managementunits`);setStatus(`${managementUnits.value.length} Management Unit(s) geladen.`);}
+      catch(e){setStatus(e.message,true);}
+    }
+    async function loadAgents(){
+      agents.value=[];agentId.value='';resetAgentData();
+      if(!managementUnit.value)return;
+      try{agents.value=await pages(`/api/v2/workforcemanagement/managementunits/${encode(managementUnit.value)}/users`);setStatus(`${agents.value.length} medewerker(s) geladen.`);}
+      catch(e){setStatus(e.message,true);}
+    }
+    async function loadUnavailable(){
+      if(!agentId.value)return;
+      busy.value=true;
+      try{
+        if(!start.value||!end.value||end.value<start.value)throw Error('Ongeldig datumbereik.');
+        const body=JSON.parse(queryBody.value.replaceAll('{{start}}',start.value).replaceAll('{{end}}',end.value));
+        lastResponse.value=await api(`/api/v2/workforcemanagement/agents/${encode(agentId.value)}/unavailabletimes/query`,'POST',body);
+        setStatus('Unavailable Times opgehaald. Controleer eventueel de ruwe API-response.');
+      }catch(e){setStatus(e.message,true);}finally{busy.value=false;}
+    }
+    async function savePatch(){
+      if(!token.value||!agentId.value||!confirmed.value||busy.value)return;
+      busy.value=true;
+      try{
+        const body=JSON.parse(patchBody.value);
+        const name=agents.value.find(a=>a.id===agentId.value)?.name||agentId.value;
+        if(!window.confirm(`Weet je zeker dat je de Unavailable Times van ${name} wilt wijzigen?`))return;
+        await api(`/api/v2/workforcemanagement/agents/${encode(agentId.value)}/unavailabletimes`,'PATCH',body);
+        confirmed.value=false;lastResponse.value=null;
+        setStatus('PATCH uitgevoerd. Haal de gegevens opnieuw op om de wijzigingen te controleren.');
+      }catch(e){setStatus(e.message,true);}finally{busy.value=false;}
+    }
+    watch([clientId,region],saveConfig);
+    onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
+    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+  }
+}).mount('#app');
