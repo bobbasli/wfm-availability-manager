@@ -51,7 +51,11 @@ createApp({
       }
       return segments.map(x=>({...x,label:`${fmt(x.from)}–${fmt(x.to)} · ${x.label}`}));
     });
-    function scheduleWeekId(s){return s.weekId||s.week?.id||null;}
+    function scheduleWeekId(s){
+      // Genesys uses weekDate (YYYY-MM-DD) as the week path parameter.
+      // Do not use the discovery alias "recent" in metadata/query requests.
+      return s.weekId || s.weekDate || s.week?.weekDate || s.week?.id || null;
+    }
     function schedulePublished(s){
       const flag=s.published??s.isPublished??s.publicationStatus;
       if(flag===true)return true;
@@ -70,7 +74,7 @@ createApp({
         const items=Array.isArray(response)?response:(response.entities||response.schedules||response.results||response.items||[]);
         const eligible=items.filter(x=>x.id&&schedulePublished(x));
         // 'recent' is a discovery alias, not a guaranteed valid weekId for metadata/query.
-        // Some list responses do not contain weekId; show a diagnostic rather than guessing.
+        // Prefer the explicit weekDate returned by Genesys when weekId is absent.
         scheduleCandidates.value=eligible.map(x=>({id:x.id,weekId:scheduleWeekId(x),name:x.name||x.description||'Gepubliceerd rooster',raw:x}));
         if(!eligible.length){scheduleState.value='Geen expliciet gepubliceerd rooster gevonden voor deze Business Unit.';return;}
         if(eligible.length===1){selectedSchedule.value=eligible[0].id;await loadSchedule();}
