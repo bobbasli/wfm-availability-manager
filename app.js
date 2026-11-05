@@ -52,18 +52,59 @@ createApp({
         const date=iso(d);days.push({date,label:new Intl.DateTimeFormat('nl-NL',{weekday:'short'}).format(d),intervals:normalized.value.filter(x=>x.date===date).map(x=>({...x,label:`${fmt(x.from)}–${fmt(x.to)}`}))});
       }return days;
     });
-    const editor=ref(null),draft=ref(null);
+    const editor=ref(null),draft=ref(null),saving=ref(false);
+    const localDateTime = ms => {const p=localParts(ms);return `${p.date}T${fmt(p.minute)}`;};
+    // Convert a local Amsterdam wall time to UTC, rejecting nonexistent and ambiguous DST times.
+    function amsterdamToUtc(value){
+      if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw Error('Ongeldige lokale datum/tijd.');
+      const naive=Date.parse(value+'Z');if(!Number.isFinite(naive))throw Error('Ongeldige datum/tijd.');
+      const candidates=[];
+      for(let offset=-120;offset<=180;offset+=30){
+        const utc=naive-offset*60000;
+        if(localDateTime(utc)===value)candidates.push(utc);
+      }
+      if(candidates.length!==1)throw Error('Dit tijdstip bestaat niet of is dubbelzinnig door de overgang tussen zomer- en wintertijd. Kies een ander tijdstip.');
+      return candidates[0];
+    }
+    function draftToSpan(){
+      if(!draft.value)throw Error('Geen tijdvak geselecteerd.');
+      const a=amsterdamToUtc(draft.value.from),b=amsterdamToUtc(draft.value.to);
+      if(b<=a)throw Error('De eindtijd moet na de begintijd liggen.');
+      const minutes=(b-a)/60000;
+      if(!Number.isInteger(minutes)||minutes>525600)throw Error('Ongeldige duur van het tijdvak.');
+      return {startDate:new Date(a).toISOString(),lengthMinutes:minutes};
+    }
+    const draftValid=computed(()=>{try{draftToSpan();return true;}catch{return false;}});
     function openEditor(slot){
       editor.value=slot?.original||null;
-      const day=slot?.date||start.value;
-      draft.value={date:day,from:slot?fmt(slot.from):'09:00',to:slot?fmt(slot.to):'17:00',notes:slot?.original?.notes||''};
+      const fromMs=slot?.original?Date.parse(slot.original.timeSpan.startDate):amsterdamToUtc(`${start.value}T09:00`);
+      const toMs=slot?.original?fromMs+slot.original.timeSpan.lengthMinutes*60000:fromMs+8*3600000;
+      draft.value={from:localDateTime(fromMs),to:localDateTime(toMs),notes:slot?.original?.notes||''};
     }
     function closeEditor(){editor.value=null;draft.value=null;}
-    const draftValid=computed(()=>!!draft.value&&!!draft.value.date&&/^\d{2}:\d{2}$/.test(draft.value.from)&&/^\d{2}:\d{2}$/.test(draft.value.to)&&draft.value.to>draft.value.from);
-    function previewDraft(){
-      if(!draftValid.value){setStatus('Controleer datum en tijden. Voor een tijdvak over middernacht zijn twee lokale dagdelen nodig.',true);return;}
-      setStatus('Concept gewijzigd. Opslaan naar Genesys is nog niet geactiveerd: PATCH-body voor toevoegen/wijzigen/verwijderen moet eerst worden bevestigd.');
-      closeEditor();
+    async function submitChange(remove=false){
+      if(!draft.value||saving.value||busy.value||!agentId.value)return;
+      const id=editor.value?.id;
+      if(remove&&!id){setStatus('Dit tijdvak heeft geen Genesys-ID en kan niet worden verwijderd.',true);return;}
+      let entity;
+      try{
+        if(remove){entity={id,delete:true};}
+        else{
+          const timeSpan=draftToSpan();
+          entity={...(id?{id}:{}),timeSpan,notes:draft.value.notes||'',delete:false};
+        }
+      }catch(e){setStatus(e.message,true);return;}
+      const name=agents.value.find(x=>x.id===agentId.value)?.name||agentId.value;
+      const verb=remove?'verwijderen':id?'wijzigen':'toevoegen';
+      if(!window.confirm(`Wil je dit tijdvak voor ${name} echt ${verb}?`))return;
+      saving.value=true;
+      try{
+        const agentAtSave=agentId.value;
+        await api(`/api/v2/workforcemanagement/agents/${encode(agentAtSave)}/unavailabletimes`,'PATCH',{entities:[entity]});
+        closeEditor();
+        if(agentId.value===agentAtSave){await loadUnavailable();setStatus(`Tijdvak ${remove?'verwijderd':id?'gewijzigd':'toegevoegd'} en opnieuw opgehaald.`);}
+      }catch(e){setStatus(`Opslaan mislukt: ${e.message}`,true);}
+      finally{saving.value=false;}
     }
     const base=()=>`https://api.${region.value}`;
     function setStatus(s,isError=false){status.value=s;error.value=isError;}
@@ -154,6 +195,6 @@ createApp({
     watch([clientId,region],saveConfig);
     watch([start,end],()=>{if(agentId.value)loadUnavailable();});
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,openEditor,closeEditor,previewDraft,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');

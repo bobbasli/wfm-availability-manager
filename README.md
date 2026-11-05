@@ -1,20 +1,18 @@
-# WFM Availability Manager v0.1.5
+# WFM Availability Manager v0.1.6
 
-Vue 3 + Tailwind CSS, direct te publiceren op GitHub Pages.
+Vue 3 + Tailwind CSS prototype voor GitHub Pages.
 
 ## Nieuw
-- Automatisch ophalen bij keuze medewerker en datumwijziging.
-- Correct ISO-8601-queryformaat.
-- Grafische weergave van `timeSpan.startDate` + `lengthMinutes` in Europe/Amsterdam.
-- Splitsen over lokale daggrenzen en zomer-/wintertijd.
-- Klikbare rode tijdvakken en concept-bewerkdialoog.
-- Toevoegen als concept, met lokale validatie.
+- Klik op een rood tijdvak om de volledige oorspronkelijke registratie te bewerken.
+- Toevoegen, wijzigen en verwijderen via `PATCH /api/v2/workforcemanagement/agents/{agentId}/unavailabletimes`.
+- Alleen het betreffende tijdvak wordt in `entities` meegestuurd.
+- Bij toevoegen wordt `id` weggelaten; bij wijzigen wordt `id` meegegeven; bij verwijderen `{id,delete:true}`. Dit is een interpretatie van het aangeleverde schema; **test deze varianten eerst op een testagent**.
+- Start/eindtijd met datum; conversie van Europe/Amsterdam naar UTC, inclusief detectie van ongeldige/dubbelzinnige DST-tijden.
+- Bevestiging vóór PATCH; opnieuw ophalen na succes.
+- Technische handmatige PATCH-editor verwijderd; API-diagnose behouden.
 
-## Veiligheidsgrens
-De grafische editor schrijft **nog niets weg**: PATCH request body voor toevoegen, wijzigen en verwijderen is nog niet bevestigd. De bestaande handmatige PATCH-diagnose is behouden, uitsluitend voor deskundige testgebruikers.
+## Publiceren
+Vervang `index.html` en `app.js` in de root van de GitHub Pages-repository. De OAuth Client ID en regio worden uit bestaande sessionStorage of URL-parameters gebruikt.
 
-## Installatie
-Upload `index.html` en `app.js` naar de root van je GitHub Pages-repository. OAuth Client ID en regio blijven in sessionStorage van dezelfde browser/tab staan. Gebruik de bestaande OAuth-configuratie.
-
-## Opmerking
-Vue 3 en Tailwind worden in deze prototypeversie via CDN geladen. Tailwind CDN is niet geschikt voor definitieve productie.
+## Grenzen
+Niet live getest tegen Genesys Cloud. PATCH-body is gebaseerd op het door de gebruiker verstrekte voorbeeldschema. Bij een afwijzing van een nieuw tijdvak controleer eerst of Genesys een lege `id` vereist. De grafische tijdlijn toont dagen binnen het geselecteerde datumbereik; een tijdvak dat over middernacht loopt opent als één volledige registratie. Tailwind CDN is prototypegebruik, geen productie-build.
