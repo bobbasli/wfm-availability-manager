@@ -1,19 +1,20 @@
-# WFM Availability Manager v0.1.4
+# WFM Availability Manager v0.1.5
 
-Correctie van de Vue-rendering: gebruikt expliciet de Vue 3 ESM browserbuild inclusief templatecompiler. Het verbindingsblok is verwijderd. Medewerkersnamen en grafische Unavailable Times-weergave zijn behouden.
+Vue 3 + Tailwind CSS, direct te publiceren op GitHub Pages.
 
-## Deploy
-Vervang `index.html` en `app.js` in de hoofdmap van je GitHub Pages-repository. Wacht op de Pages-deployment en ververs met Ctrl+Shift+R.
+## Nieuw
+- Automatisch ophalen bij keuze medewerker en datumwijziging.
+- Correct ISO-8601-queryformaat.
+- Grafische weergave van `timeSpan.startDate` + `lengthMinutes` in Europe/Amsterdam.
+- Splitsen over lokale daggrenzen en zomer-/wintertijd.
+- Klikbare rode tijdvakken en concept-bewerkdialoog.
+- Toevoegen als concept, met lokale validatie.
 
-## OAuth
-De OAuth Client ID en regio worden uit bestaande sessionStorage-instellingen gelezen. Als je een nieuwe browsersessie start zonder deze instellingen, open de app eenmalig met `?clientId=JOUW_CLIENT_ID&region=mypurecloud.de`. Deze waarden worden vervolgens voor de huidige browsersessie bewaard. Gebruik nooit een client secret in de URL.
+## Veiligheidsgrens
+De grafische editor schrijft **nog niets weg**: PATCH request body voor toevoegen, wijzigen en verwijderen is nog niet bevestigd. De bestaande handmatige PATCH-diagnose is behouden, uitsluitend voor deskundige testgebruikers.
 
-## Aandachtspunten
-- Vue en Tailwind worden nog via CDN geladen; Tailwind browser CDN is voor prototypes.
-- Query/PATCH JSON moet nog met echte Genesys-responses worden gevalideerd.
-- Grafische weergave toont alleen herkenbare tijdvakken en is nog niet bewerkbaar.
-- Niet live getest in de Genesys-organisatie.
+## Installatie
+Upload `index.html` en `app.js` naar de root van je GitHub Pages-repository. OAuth Client ID en regio blijven in sessionStorage van dezelfde browser/tab staan. Gebruik de bestaande OAuth-configuratie.
 
-## Fix v0.1.4
-- Ongeldige geneste Vue-interpolaties in de HTML vervangen door `v-pre` placeholders. Dit voorkwam templatecompilatie.
-- Nog niet live getest in de Genesys-omgeving.
+## Opmerking
+Vue 3 en Tailwind worden in deze prototypeversie via CDN geladen. Tailwind CDN is niet geschikt voor definitieve productie.
