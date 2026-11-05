@@ -54,6 +54,9 @@ createApp({
     });
     const editor=ref(null),draft=ref(null),saving=ref(false);
     const localDateTime = ms => {const p=localParts(ms);return `${p.date}T${fmt(p.minute)}`;};
+    const splitLocal = ms => {const p=localParts(ms);return {date:p.date,time:fmt(p.minute)};};
+    const joinLocal = (date,time) => `${date}T${time}`;
+    const editError=computed(()=>{if(!draft.value)return '';try{draftToSpan();return '';}catch(e){return e.message;}});
     // Convert a local Amsterdam wall time to UTC, rejecting nonexistent and ambiguous DST times.
     function amsterdamToUtc(value){
       if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw Error('Ongeldige lokale datum/tijd.');
@@ -68,7 +71,7 @@ createApp({
     }
     function draftToSpan(){
       if(!draft.value)throw Error('Geen tijdvak geselecteerd.');
-      const a=amsterdamToUtc(draft.value.from),b=amsterdamToUtc(draft.value.to);
+      const a=amsterdamToUtc(joinLocal(draft.value.fromDate,draft.value.fromTime)),b=amsterdamToUtc(joinLocal(draft.value.toDate,draft.value.toTime));
       if(b<=a)throw Error('De eindtijd moet na de begintijd liggen.');
       const minutes=(b-a)/60000;
       if(!Number.isInteger(minutes)||minutes>525600)throw Error('Ongeldige duur van het tijdvak.');
@@ -79,7 +82,8 @@ createApp({
       editor.value=slot?.original||null;
       const fromMs=slot?.original?Date.parse(slot.original.timeSpan.startDate):amsterdamToUtc(`${start.value}T09:00`);
       const toMs=slot?.original?fromMs+slot.original.timeSpan.lengthMinutes*60000:fromMs+8*3600000;
-      draft.value={from:localDateTime(fromMs),to:localDateTime(toMs),notes:slot?.original?.notes||''};
+      const from=splitLocal(fromMs),to=splitLocal(toMs);
+      draft.value={fromDate:from.date,fromTime:from.time,toDate:to.date,toTime:to.time,notes:slot?.original?.notes||''};
     }
     function closeEditor(){editor.value=null;draft.value=null;}
     async function submitChange(remove=false){
@@ -195,6 +199,6 @@ createApp({
     watch([clientId,region],saveConfig);
     watch([start,end],()=>{if(agentId.value)loadUnavailable();});
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');
