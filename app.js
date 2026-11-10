@@ -27,6 +27,8 @@ createApp({
     const capacityWeek=ref(iso(monday));
     const capacityBusy=ref(false),capacityProgress=ref(''),capacityRows=ref([]),capacityError=ref('');
     const capacityDiagnostics=ref([]);
+    const capacityMargin=ref(Math.min(100,Math.max(0,Number(localStorage.getItem('wfm_capacity_margin')??25)||0)));
+    watch(capacityMargin,v=>localStorage.setItem('wfm_capacity_margin',String(v)));
     const hoursText=n=>Number.isFinite(n)?(Math.round(n*100)/100).toLocaleString('nl-NL',{maximumFractionDigits:2})+' u':'—';
     const pctText=n=>Number.isFinite(n)?(Math.round(n*10)/10).toLocaleString('nl-NL',{maximumFractionDigits:1})+'%':'—';
     function mondayDate(date){const d=new Date(date+'T12:00:00');if(!Number.isFinite(+d))return null;d.setDate(d.getDate()-(d.getDay()+6)%7);return iso(d);}
@@ -43,24 +45,58 @@ createApp({
       if(Number.isFinite(exact)&&exact>=0)return {min:exact/60,max:exact/60};
       return null;
     }
-    function unavailableHours(response,week,next){
+    const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    function unionIntervals(intervals){
+      const sorted=intervals.filter(([a,b])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a).sort((x,y)=>x[0]-y[0]);
+      const result=[];
+      for(const [a,b] of sorted){const last=result[result.length-1];if(last&&a<=last[1])last[1]=Math.max(last[1],b);else result.push([a,b]);}
+      return result;
+    }
+    function intervalHours(intervals){return intervals.reduce((sum,[a,b])=>sum+(b-a)/3600000,0);}
+    function unavailableIntervals(response,week,next){
       const list=Array.isArray(response)?response:(response?.entities??response?.unavailableTimes??response?.results??response?.items);
       if(!Array.isArray(list))throw Error('Onbekende Unavailable Times-response.');
-      // Compare by local calendar date; preserve DST and clip to exactly seven Amsterdam days.
-      const weekStart=amsterdamToUtc(week+'T00:00');const weekEnd=amsterdamToUtc(next+'T00:00');
+      const start=amsterdamToUtc(week+'T00:00'),end=amsterdamToUtc(next+'T00:00');
       const intervals=[];
       for(const item of list){
         const span=item?.timeSpan??item;
-        const begin=Date.parse(span?.startDate);const minutes=Number(span?.lengthMinutes);
-        if(!Number.isFinite(begin)||!Number.isFinite(minutes)||minutes<0)throw Error('Ongeldig tijdvak ontvangen.');
-        const a=Math.max(begin,weekStart),b=Math.min(begin+minutes*60000,weekEnd);
-        if(b>a)intervals.push([a,b]);
+        const a=Date.parse(span?.startDate);let b=Date.parse(span?.endDate);
+        if(!Number.isFinite(b)&&Number.isFinite(Number(span?.lengthMinutes)))b=a+Number(span.lengthMinutes)*60000;
+        if(!Number.isFinite(a)||!Number.isFinite(b)||b<a)throw Error('Ongeldig tijdvak ontvangen.');
+        intervals.push([Math.max(start,a),Math.min(end,b)]);
       }
-      intervals.sort((a,b)=>a[0]-b[0]);
-      let total=0,lastStart=null,lastEnd=null;
-      for(const [a,b] of intervals){if(lastStart===null){lastStart=a;lastEnd=b;}else if(a<=lastEnd){lastEnd=Math.max(lastEnd,b);}else{total+=lastEnd-lastStart;lastStart=a;lastEnd=b;}}
-      if(lastStart!==null)total+=lastEnd-lastStart;
-      return total/3600000;
+      return unionIntervals(intervals);
+    }
+    function workPlanWindows(plan,week,next){
+      if(!Array.isArray(plan?.shifts)||!plan.shifts.length)return {intervals:[],warning:'Work Plan bevat geen dienstdefinities'};
+      const result=[];const first=new Date(week+'T12:00:00');
+      // Include the preceding day: a night shift may extend into Monday.
+      for(let offset=-1;offset<7;offset++){
+        const day=new Date(first);day.setDate(first.getDate()+offset);
+        const date=iso(day),dayName=dayNames[day.getDay()];
+        for(const shift of plan.shifts){
+          if(shift.constrainDayOff===true)continue;
+          const allowed=shift?.days?.values;
+          if(!Array.isArray(allowed)||!allowed.includes(dayName))continue;
+          const flexible=shift.flexibleStartTime===true;
+          const earliest=Number(flexible?shift.earliestStartTimeMinutesFromMidnight:shift.exactStartTimeMinutesFromMidnight);
+          const latest=Number(flexible?shift.latestStartTimeMinutesFromMidnight:shift.exactStartTimeMinutesFromMidnight);
+          const paid=Number(shift.flexiblePaidTime===true?shift.maximumPaidTimeMinutes:shift.exactPaidTimeMinutes);
+          if(![earliest,latest,paid].every(Number.isFinite)||earliest<0||latest<earliest||paid<=0)continue;
+          // Add explicitly unpaid activity lengths. This is an outer envelope, not a guaranteed feasible shift.
+          const unpaid=Array.isArray(shift.activities)?shift.activities.reduce((n,x)=>n+(x.countsAsPaidTime===false?Math.max(0,Number(x.lengthMinutes)||0):0),0):0;
+          const start=amsterdamToUtc(date+'T00:00')+earliest*60000;
+          const finish=amsterdamToUtc(date+'T00:00')+(latest+paid+unpaid)*60000;
+          const weekStart=amsterdamToUtc(week+'T00:00'),weekEnd=amsterdamToUtc(next+'T00:00');
+          result.push([Math.max(start,weekStart),Math.min(finish,weekEnd)]);
+        }
+      }
+      return {intervals:unionIntervals(result),warning:result.length?'':'Geen mogelijke diensten in deze week'};
+    }
+    function intersectionHours(allowed,blocked){
+      let sum=0,i=0,j=0;
+      while(i<allowed.length&&j<blocked.length){const a=allowed[i],b=blocked[j];sum+=Math.max(0,Math.min(a[1],b[1])-Math.max(a[0],b[0]));if(a[1]<b[1])i++;else j++;}
+      return sum/3600000;
     }
     async function loadCapacity(){
       if(capacityBusy.value||!managementUnit.value||!businessUnit.value||!token.value)return;
@@ -76,16 +112,17 @@ createApp({
         // Listing may expose agent associations; do not assume empty means unassigned.
         const planByAgent=new Map();
         for(const plan of allPlans){for(const person of (Array.isArray(plan.agents)?plan.agents:[])){const id=person?.id??person?.user?.id??person?.userId;if(id)planByAgent.set(id,plan.id);}}
-        const results=new Array(roster.length);let index=0;
+        const results=new Array(roster.length);let index=0;const planDetailCache=new Map();
+        async function detailedPlan(id){if(!planDetailCache.has(id))planDetailCache.set(id,api(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/workplans/${encode(id)}`));return planDetailCache.get(id);}
         async function worker(){
           while(index<roster.length){const i=index++,agent=roster[i];
             if(mu!==managementUnit.value||bu!==businessUnit.value)return;
-            const row={id:agent.id,name:agent.name||agent.id,planName:'Niet vastgesteld',min:null,max:null,unavailable:null,pctMin:null,pctMax:null,warning:[]};
+            const row={id:agent.id,name:agent.name||agent.id,planName:'Niet vastgesteld',min:null,max:null,unavailable:null,windowHours:null,available:null,requiredMin:null,requiredMax:null,pctMin:null,pctMax:null,maxDays:null,warning:[]};
             try{
               const detail=await api(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/agents/${encode(agent.id)}`);
               const planId=planReference(detail)||planReference(detail?.agent)||planReference(detail?.result)||planByAgent.get(agent.id);
               const plan=planMap.get(planId);
-              if(plan){const hours=workPlanHours(plan);row.planName=plan.name||'Work Plan';if(hours){row.min=hours.min;row.max=hours.max;}else row.warning.push('Werkuren ontbreken in Work Plan');}
+              if(plan){const detailPlan=await detailedPlan(plan.id);const hours=workPlanHours(detailPlan);row.planName=detailPlan.name||plan.name||'Work Plan';row.maxDays=detailPlan.maximumDays??null;if(hours){row.min=hours.min;row.max=hours.max;}else row.warning.push('Werkuren ontbreken in Work Plan');const windows=workPlanWindows(detailPlan,week,next);row._windows=windows.intervals;row.windowHours=intervalHours(windows.intervals);if(windows.warning)row.warning.push(windows.warning);}
               else row.warning.push('Effectief Work Plan niet bevestigd (mogelijk rotatie/override)');
             }catch(e){row.warning.push('Work Plan: '+e.message);}
             try{
@@ -93,13 +130,15 @@ createApp({
               const from=new Date(week+'T00:00:00Z');from.setUTCDate(from.getUTCDate()-1);
               const to=new Date(next+'T00:00:00Z');to.setUTCDate(to.getUTCDate()+1);
               const response=await api(`/api/v2/workforcemanagement/agents/${encode(agent.id)}/unavailabletimes/query`,'POST',{startDate:from.toISOString(),endDate:to.toISOString()});
-              row.unavailable=unavailableHours(response,week,next);
+              const unavailable=unavailableIntervals(response,week,next);row.unavailable=intervalHours(unavailable);if(row._windows){row.blockedWithinWindows=intersectionHours(row._windows,unavailable);row.available=Math.max(0,row.windowHours-row.blockedWithinWindows);}
             }catch(e){row.warning.push('Niet beschikbaar: '+e.message);}
-            if(row.min!==null&&row.max!==null&&row.unavailable!==null){
-              // Available share varies with flexible weekly paid hours; never extrapolate negative capacity.
-              const percent=hours=>hours>0?Math.max(0,Math.min(100,(hours-row.unavailable)/hours*100)):null;
-              row.pctMin=percent(row.min);row.pctMax=percent(row.max);
+            if(row.min!==null&&row.max!==null&&row.available!==null){
+              const factor=1+capacityMargin.value/100;
+              row.requiredMin=row.min*factor;row.requiredMax=row.max*factor;
+              const coverage=required=>required>0?row.available/required*100:null;
+              row.pctMin=coverage(row.requiredMax);row.pctMax=coverage(row.requiredMin);
             }
+            delete row._windows;
             results[i]=row;capacityRows.value=results.filter(Boolean);capacityProgress.value=`${capacityRows.value.length} van ${roster.length} medewerkers verwerkt`;
           }
         }
@@ -417,6 +456,6 @@ createApp({
     watch([clientId,region],saveConfig);
     watch([start,end],()=>{if(agentId.value){loadUnavailable();discoverSchedules();}});
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {activeTab,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');

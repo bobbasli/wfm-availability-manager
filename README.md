@@ -1,9 +1,12 @@
-WFM Availability Manager v0.1.9.6
+WFM Availability Manager v0.1.9.7
 
-Nieuw: tabblad Capaciteit & beschikbaarheid. Selecteer BU en MU, kies een week en klik Overzicht ophalen.
+Nieuwe tab Capaciteit & beschikbaarheid:
+- Klantonafhankelijke marge 0-100% (standaard 25%, browser-lokaal bewaard).
+- Work Plan-dienstvensters worden bepaald met vroegste/laatste start, maximale betaalde dienstlengte en expliciet onbetaalde activiteiten. Nachtdiensten over de weekgrens worden meegenomen.
+- Onbeschikbaarheid wordt alleen afgetrokken voor overlap met samengevoegde dienstvensters.
+- Normdekking toont een bereik bij flexibele wekelijkse betaalde uren en kan boven 100% uitkomen.
+- Maximaal aantal werkdagen is zichtbaar, niet verwerkt in de uurdekking.
 
-De applicatie leest alle MU-medewerkers, Work Plans en Unavailable Times. Work Plan-koppeling wordt alleen getoond als deze via de agentdetail-API of expliciete plan-associatie is vast te stellen. Bij ontbrekende koppeling geen verzonnen cijfers. Flexibele betaalde uren worden als minimum–maximum weergegeven; de percentages zijn overeenkomstige bandbreedtes. Overlappende niet-beschikbare tijdvakken worden niet dubbel geteld. Tijdelijke workplan-rotaties/overrides nog niet ondersteund.
+Beperkingen: inzetvensters zijn een theoretische bovengrens. Combinaties van diensten, rustregels, beperkingen per planningsperiode, exacte pauzeplaatsing, rotaties en tijdelijke Work Plan-toewijzingen zijn niet volledig geverifieerd. Bij niet vastgestelde toewijzing geen schijnpercentages. De app leest deze gegevens alleen; de bestaande Unavailable Times-editor blijft ongewijzigd.
 
-Let op: de app is een prototype; de API-response van de agentdetail-API is nog niet live gevalideerd. Het overzicht toont bij onbekende koppeling een melding in plaats van een schatting. Bestaande roostereditor ongewijzigd.
-
-Publiceer index.html en app.js samen. OAuth redirect URI moet overeenkomen met de hosting-URL.
+Installatie: vervang index.html en app.js samen; Ctrl+Shift+R. Controleer de versie in de header.
