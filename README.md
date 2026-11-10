@@ -1,14 +1,9 @@
-# WFM Availability Manager v0.1.9.5.2
+WFM Availability Manager v0.1.9.6
 
-Herstelrelease op basis van v0.1.9.5.
+Nieuw: tabblad Capaciteit & beschikbaarheid. Selecteer BU en MU, kies een week en klik Overzicht ophalen.
 
-- Activity Codes worden alleen verwerkt als de API daadwerkelijk een array met objecten teruggeeft.
-- Onverwachte Activity Codes-response geeft een waarschuwing in plaats van een vastlopende weergave.
-- Kleurvelden die objecten zijn worden veilig uitgelezen.
-- Rooster- en activiteitarrays worden defensief verwerkt.
-- De bestaande Unavailable Times-editor, gepubliceerde roosters en Tailwind-header blijven behouden.
-- Cache-busting app.js?v=0.1.9.5.2.
+De applicatie leest alle MU-medewerkers, Work Plans en Unavailable Times. Work Plan-koppeling wordt alleen getoond als deze via de agentdetail-API of expliciete plan-associatie is vast te stellen. Bij ontbrekende koppeling geen verzonnen cijfers. Flexibele betaalde uren worden als minimum–maximum weergegeven; de percentages zijn overeenkomstige bandbreedtes. Overlappende niet-beschikbare tijdvakken worden niet dubbel geteld. Tijdelijke workplan-rotaties/overrides nog niet ondersteund.
 
-Upload index.html en app.js samen naar GitHub Pages. Bij een blijvende blanco pagina graag de exacte eerste rode fout uit de browserconsole (F12 > Console) delen.
+Let op: de app is een prototype; de API-response van de agentdetail-API is nog niet live gevalideerd. Het overzicht toont bij onbekende koppeling een melding in plaats van een schatting. Bestaande roostereditor ongewijzigd.
 
-Fix: Activity Codes worden altijd naar een array genormaliseerd; geen .map() op een object.
+Publiceer index.html en app.js samen. OAuth redirect URI moet overeenkomen met de hosting-URL.

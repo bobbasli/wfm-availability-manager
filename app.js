@@ -22,6 +22,93 @@ createApp({
     const scheduleData=ref(null),scheduleError=ref(''),scheduleBusy=ref(false);
     const scheduleCandidates=ref([]),selectedSchedule=ref(''),scheduleDiagnostics=ref(null);
     const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
+    // Separate weekly MU capacity view. Read-only, never changes agent availability.
+    const activeTab=ref('calendar');
+    const capacityWeek=ref(iso(monday));
+    const capacityBusy=ref(false),capacityProgress=ref(''),capacityRows=ref([]),capacityError=ref('');
+    const capacityDiagnostics=ref([]);
+    const hoursText=n=>Number.isFinite(n)?(Math.round(n*100)/100).toLocaleString('nl-NL',{maximumFractionDigits:2})+' u':'—';
+    const pctText=n=>Number.isFinite(n)?(Math.round(n*10)/10).toLocaleString('nl-NL',{maximumFractionDigits:1})+'%':'—';
+    function mondayDate(date){const d=new Date(date+'T12:00:00');if(!Number.isFinite(+d))return null;d.setDate(d.getDate()-(d.getDay()+6)%7);return iso(d);}
+    function weeklyBounds(){const week=mondayDate(capacityWeek.value);if(!week)throw Error('Kies een geldige week.');const d=new Date(week+'T12:00:00');d.setDate(d.getDate()+7);return {week,next:iso(d)};}
+    function planReference(agent){
+      const possibilities=[agent?.effectiveWorkPlan,agent?.workPlan,agent?.workPlanConfiguration,agent?.defaultWorkPlan,agent?.workPlanId,agent?.defaultWorkPlanId,agent?.workPlanConfigurationId,agent?.workPlan?.id,agent?.workPlanConfiguration?.id,agent?.effectiveWorkPlanId];
+      for(const v of possibilities){const id=typeof v==='string'?v:v?.id;if(typeof id==='string'&&id)return id;}
+      return null;
+    }
+    function workPlanHours(plan){
+      if(!plan)return null;
+      const exact=Number(plan.weeklyExactPaidMinutes),minimum=Number(plan.weeklyMinimumPaidMinutes),maximum=Number(plan.weeklyMaximumPaidMinutes);
+      if(plan.flexibleWeeklyPaidTime===true&&Number.isFinite(minimum)&&Number.isFinite(maximum)&&maximum>=minimum)return {min:minimum/60,max:maximum/60};
+      if(Number.isFinite(exact)&&exact>=0)return {min:exact/60,max:exact/60};
+      return null;
+    }
+    function unavailableHours(response,week,next){
+      const list=Array.isArray(response)?response:(response?.entities??response?.unavailableTimes??response?.results??response?.items);
+      if(!Array.isArray(list))throw Error('Onbekende Unavailable Times-response.');
+      // Compare by local calendar date; preserve DST and clip to exactly seven Amsterdam days.
+      const weekStart=amsterdamToUtc(week+'T00:00');const weekEnd=amsterdamToUtc(next+'T00:00');
+      const intervals=[];
+      for(const item of list){
+        const span=item?.timeSpan??item;
+        const begin=Date.parse(span?.startDate);const minutes=Number(span?.lengthMinutes);
+        if(!Number.isFinite(begin)||!Number.isFinite(minutes)||minutes<0)throw Error('Ongeldig tijdvak ontvangen.');
+        const a=Math.max(begin,weekStart),b=Math.min(begin+minutes*60000,weekEnd);
+        if(b>a)intervals.push([a,b]);
+      }
+      intervals.sort((a,b)=>a[0]-b[0]);
+      let total=0,lastStart=null,lastEnd=null;
+      for(const [a,b] of intervals){if(lastStart===null){lastStart=a;lastEnd=b;}else if(a<=lastEnd){lastEnd=Math.max(lastEnd,b);}else{total+=lastEnd-lastStart;lastStart=a;lastEnd=b;}}
+      if(lastStart!==null)total+=lastEnd-lastStart;
+      return total/3600000;
+    }
+    async function loadCapacity(){
+      if(capacityBusy.value||!managementUnit.value||!businessUnit.value||!token.value)return;
+      capacityBusy.value=true;capacityError.value='';capacityRows.value=[];capacityDiagnostics.value=[];
+      const mu=managementUnit.value,bu=businessUnit.value;
+      try{
+        const {week,next}=weeklyBounds();capacityWeek.value=week;
+        const roster=[...agents.value];if(!roster.length){capacityProgress.value='Geen medewerkers gevonden.';return;}
+        capacityProgress.value='Work Plans ophalen…';
+        const allPlans=await pages(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/workplans`);
+        if(mu!==managementUnit.value||bu!==businessUnit.value)return;
+        const planMap=new Map(allPlans.filter(x=>x?.id).map(x=>[x.id,x]));
+        // Listing may expose agent associations; do not assume empty means unassigned.
+        const planByAgent=new Map();
+        for(const plan of allPlans){for(const person of (Array.isArray(plan.agents)?plan.agents:[])){const id=person?.id??person?.user?.id??person?.userId;if(id)planByAgent.set(id,plan.id);}}
+        const results=new Array(roster.length);let index=0;
+        async function worker(){
+          while(index<roster.length){const i=index++,agent=roster[i];
+            if(mu!==managementUnit.value||bu!==businessUnit.value)return;
+            const row={id:agent.id,name:agent.name||agent.id,planName:'Niet vastgesteld',min:null,max:null,unavailable:null,pctMin:null,pctMax:null,warning:[]};
+            try{
+              const detail=await api(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/agents/${encode(agent.id)}`);
+              const planId=planReference(detail)||planReference(detail?.agent)||planReference(detail?.result)||planByAgent.get(agent.id);
+              const plan=planMap.get(planId);
+              if(plan){const hours=workPlanHours(plan);row.planName=plan.name||'Work Plan';if(hours){row.min=hours.min;row.max=hours.max;}else row.warning.push('Werkuren ontbreken in Work Plan');}
+              else row.warning.push('Effectief Work Plan niet bevestigd (mogelijk rotatie/override)');
+            }catch(e){row.warning.push('Work Plan: '+e.message);}
+            try{
+              // Include offset padding for time spans that overlap a local week boundary.
+              const from=new Date(week+'T00:00:00Z');from.setUTCDate(from.getUTCDate()-1);
+              const to=new Date(next+'T00:00:00Z');to.setUTCDate(to.getUTCDate()+1);
+              const response=await api(`/api/v2/workforcemanagement/agents/${encode(agent.id)}/unavailabletimes/query`,'POST',{startDate:from.toISOString(),endDate:to.toISOString()});
+              row.unavailable=unavailableHours(response,week,next);
+            }catch(e){row.warning.push('Niet beschikbaar: '+e.message);}
+            if(row.min!==null&&row.max!==null&&row.unavailable!==null){
+              // Available share varies with flexible weekly paid hours; never extrapolate negative capacity.
+              const percent=hours=>hours>0?Math.max(0,Math.min(100,(hours-row.unavailable)/hours*100)):null;
+              row.pctMin=percent(row.min);row.pctMax=percent(row.max);
+            }
+            results[i]=row;capacityRows.value=results.filter(Boolean);capacityProgress.value=`${capacityRows.value.length} van ${roster.length} medewerkers verwerkt`;
+          }
+        }
+        await Promise.all(Array.from({length:Math.min(4,roster.length)},()=>worker()));
+        if(mu!==managementUnit.value||bu!==businessUnit.value)return;
+        capacityProgress.value=`${capacityRows.value.length} medewerkers geladen · week ${week}`;
+      }catch(e){capacityError.value=e.message;}
+      finally{capacityBusy.value=false;}
+    }
     const activityCodes=ref([]),activityCodeError=ref('');
     const activityCodeMap=computed(()=>new Map((Array.isArray(activityCodes.value)?activityCodes.value:[]).filter(c=>c&&typeof c==='object'&&c.id!=null).map(c=>[String(c.id),c])));
     function codeColor(code){
@@ -287,16 +374,16 @@ createApp({
       try{const me=await api('/api/v2/users/me');identity.value=me.name||'Aangemeld';businessUnits.value=await pages('/api/v2/workforcemanagement/businessunits');setStatus(`${businessUnits.value.length} Business Unit(s) geladen.`);}
       catch(e){setStatus(e.message,true);}finally{busy.value=false;}
     }
-    function logout(){token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
+    function logout(){capacityRows.value=[];activeTab.value='calendar';token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
     function resetAgentData(){lastResponse.value=null;scheduleData.value=null;scheduleError.value='';scheduleCandidates.value=[];selectedSchedule.value='';scheduleDiagnostics.value=null;activityCodes.value=[];activityCodeError.value='';confirmed.value=false;closeEditor();if(agentId.value){loadUnavailable();discoverSchedules();}}
     async function loadManagementUnits(){
-      managementUnit.value='';managementUnits.value=[];agents.value=[];agentId.value='';resetAgentData();
+      capacityRows.value=[];managementUnit.value='';managementUnits.value=[];agents.value=[];agentId.value='';resetAgentData();
       if(!businessUnit.value)return;
       try{managementUnits.value=await pages(`/api/v2/workforcemanagement/businessunits/${encode(businessUnit.value)}/managementunits`);setStatus(`${managementUnits.value.length} Management Unit(s) geladen.`);}
       catch(e){setStatus(e.message,true);}
     }
     async function loadAgents(){
-      agents.value=[];agentId.value='';resetAgentData();
+      capacityRows.value=[];agents.value=[];agentId.value='';resetAgentData();
       if(!managementUnit.value)return;
       try{const list=await pages(`/api/v2/workforcemanagement/managementunits/${encode(managementUnit.value)}/users`);
         agents.value=list.map(x=>({...x,name:x.name||x.user?.name||x.userName||x.displayName||''}));
@@ -330,6 +417,6 @@ createApp({
     watch([clientId,region],saveConfig);
     watch([start,end],()=>{if(agentId.value){loadUnavailable();discoverSchedules();}});
     onMounted(async()=>{try{await callback();await initialize();}catch(e){setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {activeTab,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
   }
 }).mount('#app');
