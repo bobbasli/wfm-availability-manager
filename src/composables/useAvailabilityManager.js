@@ -4,7 +4,7 @@ import { localParts, amsterdamToUtc, localDayBounds, isPublished } from '../doma
 import { validateRegion } from '../services/regions';
 import { ref, computed, onMounted, watch } from 'vue';
 import { createGenesysApi, exchangeOAuthCode } from '../services/genesysApi';
-import { queryAgentWorkPlans } from '../services/workforceManagement';
+import { queryAgentWorkPlans, createWorkPlanDetailsLoader } from '../services/workforceManagement';
 
 const redirect = location.origin + location.pathname;
 const qs = new URLSearchParams(location.search);
@@ -71,28 +71,23 @@ export function useAvailabilityManager(){
         const current=()=>version===capacityVersion;
         const roster=[...agents.value];if(!roster.length){capacityProgress.value='Geen medewerkers gevonden.';return;}
         capacityProgress.value='Work Plans ophalen…';
-        const allPlans=await pages(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/workplans`);
-        if(!current())return;
-        const planMap=new Map(allPlans.filter(x=>x?.id).map(x=>[x.id,x]));
-        // A week-specific assignment is authoritative. Never fall back to an arbitrary Work Plan.
-        let assignmentByAgent=new Map();
+        let assignmentByAgent=new Map(),assignmentWarnings=new Map();
         try{
           const response=await queryAgentWorkPlans(api,mu,roster.map(agent=>agent.id),week);
           if(!current())return;
-          assignmentByAgent=response.assignments;
+          assignmentByAgent=response.assignments;assignmentWarnings=response.warnings;
           if(response.warning)capacityDiagnostics.value.push(response.warning);
         }catch(e){if(!current())return;capacityDiagnostics.value.push(`Work Plan-toewijzingen: ${e.message}`);}
-        const results=new Array(roster.length);let index=0;const planDetailCache=new Map();
-        async function detailedPlan(id){if(!planDetailCache.has(id))planDetailCache.set(id,api(`/api/v2/workforcemanagement/managementunits/${encode(mu)}/workplans/${encode(id)}`));return planDetailCache.get(id);}
+        const results=new Array(roster.length);let index=0;
+        const detailedPlan=createWorkPlanDetailsLoader(api,mu);
         async function worker(){
           while(index<roster.length){const i=index++,agent=roster[i];
             if(!current())return;
             const row={id:agent.id,name:agent.name||agent.id,planName:'Niet vastgesteld',min:null,max:null,unavailable:null,windowHours:null,available:null,requiredMin:null,requiredMax:null,pctMin:null,pctMax:null,maxDays:null,warning:[]};
             try{
               const planId=assignmentByAgent.get(agent.id);
-              const plan=planMap.get(planId);
-              if(plan){const detailPlan=await detailedPlan(plan.id);const hours=workPlanHours(detailPlan);row.planName=detailPlan.name||plan.name||'Work Plan';row.maxDays=detailPlan.maximumDays??null;if(hours){row.min=hours.min;row.max=hours.max;}else row.warning.push('Werkuren ontbreken in Work Plan');const windows=workPlanWindows(detailPlan,week,next);row._windows=windows.intervals;row.windowHours=intervalHours(windows.intervals);if(windows.warning)row.warning.push(windows.warning);}
-              else row.warning.push('Niet vastgesteld: week, rotatie, override en planversie zijn niet bevestigd');
+              if(planId){const detailPlan=await detailedPlan(planId);const hours=workPlanHours(detailPlan);row.planName=detailPlan.name||'Work Plan';row.maxDays=detailPlan.maximumDays??null;if(hours){row.min=hours.min;row.max=hours.max;}else row.warning.push('Werkuren ontbreken in Work Plan');const windows=workPlanWindows(detailPlan,week,next);row._windows=windows.intervals;row.windowHours=intervalHours(windows.intervals);if(windows.warning)row.warning.push(windows.warning);}
+              else row.warning.push(assignmentWarnings.get(agent.id)||'Geen geldige Work Plan-toewijzing voor deze medewerker en week.');
             }catch(e){row.warning.push('Work Plan: '+e.message);}
             try{
               // Include offset padding for time spans that overlap a local week boundary.

@@ -32,7 +32,7 @@ Verbind Codex met deze repository en verwijs naar `AGENTS.md`. Start je werk van
 ## Tests en beperkingen
 Lokaal: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`. Gebruik Node.js 22 (zie `.nvmrc`). Geen Node-installatie op je Windows-pc vereist: GitHub Actions voert deze stappen uit. GitHub Actions installeert reproduceerbaar via `npm ci` en voert regressietests, de statische migratiecheck en de productiebuild uit.
 
-**Openstaand:** de echte response-vorm van `POST .../agents/workplans/query` is nog niet geverifieerd. Zolang dit contract niet met productiegegevens is geverifieerd, worden alle toewijzingen als ‘Niet vastgesteld’ behandeld en geen capaciteitspercentages getoond. Herkenbare IDs alleen zijn geen bewijs voor week, rotatie, override of planversie. Een groene build bewijst geen juiste API-scopes, OAuth redirect of werkend scenario in Genesys.
+**Work Plan-toewijzing:** de app gebruikt het door de gebruiker opgegeven weeklookupcontract: `result.entities[].user.id`, `workPlanLookupKeysPerWeek`, `referenceStartWeekDate` en `workPlanLookup`. Per medewerker wordt uitsluitend de sleutel voor de gekozen week gebruikt. Ontbrekende of ongeldige toewijzingen blijven ‘Niet vastgesteld’, zonder percentage. Details worden per plan-ID en refresh gecachet. Live controle van rotaties, overrides en planversies blijft nodig; een groene build bewijst geen juiste API-scopes of live gegevens.
 
 ## Herstelronde v0.2.0 (nog niet uitgebracht)
 - Regio’s zijn beperkt tot ondersteunde Genesys Cloud-domeinen. Sessies zijn aan regio en OAuth-client gebonden; na deze wijziging is opnieuw aanmelden nodig voor bestaande sessies.

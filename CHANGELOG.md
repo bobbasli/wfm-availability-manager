@@ -4,7 +4,9 @@
 - Hersteld: verouderde responses bij medewerker-/MU-wissels en verkeerde koppeling tussen editor en medewerker.
 - Beveiligd: exacte regiovalidatie, sessiebinding aan OAuth-client/regio, centrale tokenuitwisseling en opruimen bij 401.
 - Hersteld: Amsterdamse querygrenzen, lokale shiftstarts rond DST en exacte publicatiestatuscontrole.
-- Work Plan-toewijzingen blijven nu volledig onbevestigd totdat het productiecontract inclusief week/rotatie/override/planversie is gevalideerd.
+- Work Plan-toewijzingen geïmplementeerd volgens het opgegeven weeklookupcontract: user.id, referentieweek, numerieke weeksleutel en lookup naar het echte plan-ID.
+- Details rechtstreeks opgehaald met verplichte MU-ID en een gedeelde cache per plan-ID/refresh; ontbrekende of ongeldige assignments krijgen per medewerker een melding zonder dekking.
+- Toegevoegd: regressietests voor meerdere medewerkers, planwijzigingen tussen weken, DST-weekindexering, foutieve assignments en gedeelde detailrequests. Live rotatie-/override-/planversiecontrole blijft open.
 - Toegevoegd: getypeerde tijd-/capaciteitshelpers, dialoogfocusbeheer, regressietests, lockfile en CI met npm ci.
 - Live Genesys-acceptatie is nog niet uitgevoerd.
 

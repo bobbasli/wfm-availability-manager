@@ -30,7 +30,7 @@ describe('API-veiligheid',()=>{
   });
   it('berekent geen capaciteit uit een ongeverifieerde assignment',async()=>{
     vi.stubGlobal('fetch',vi.fn().mockResolvedValue(response({assignments:[{agentId:'synthetic',workPlanId:'old-plan',startDate:'2025-01-01'}]})));
-    const result=await queryAgentWorkPlans(createGenesysApi(config()).request,'synthetic-mu',['synthetic'],'2026-11-09');expect(result.assignments.size).toBe(0);expect(result.warning).toContain('niet geverifieerd');
+    const result=await queryAgentWorkPlans(createGenesysApi(config()).request,'synthetic-mu',['synthetic'],'2026-11-09');expect(result.assignments.size).toBe(0);expect(result.warning).toContain('result ontbreekt');
   });
 });
 it('laat een verlopen oud token een nieuwe sessie niet wissen',async()=>{

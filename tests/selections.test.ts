@@ -91,3 +91,33 @@ it('maakt geen duplicaat wanneer een bestaand tijdvak geen ID heeft',async()=>{
   const fetch=vi.fn();vi.stubGlobal('fetch',fetch);await manager.submitChange();
   expect(manager.status.value).toContain('geen geldige Genesys-ID');expect(fetch).not.toHaveBeenCalled();
 });
+it('berekent capaciteit met eigen weekplannen en haalt gedeelde details één keer op',async()=>{
+  const fetch=vi.fn(async(input: string)=>{
+    if(input.endsWith('/agents/workplans/query'))return json({result:{referenceStartWeekDate:'2026-11-02',entities:[
+      {user:{id:'employee-a'},workPlanLookupKeysPerWeek:[1,0]},
+      {user:{id:'employee-b'},workPlanLookupKeysPerWeek:[0,1]},
+      {user:{id:'employee-c'},workPlanLookupKeysPerWeek:[null,null]},
+      {user:{id:'employee-d'},workPlanLookupKeysPerWeek:[1,0]},
+    ],workPlanLookup:{'0':{id:'plan-a'},'1':{id:'plan-b'}}}});
+    if(input.includes('/workplans/')){const id=input.split('/').at(-1),minutes=id==='plan-a'?480:240;return json({id,name:id,weeklyExactPaidMinutes:minutes,maximumDays:1,shifts:[{days:{values:['Monday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:minutes}]});}
+    return json({entities:[]});
+  });vi.stubGlobal('fetch',fetch);
+  manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.capacityWeek.value='2026-11-09';
+  manager.agents.value=['a','b','c','d'].map(id=>({id:'employee-'+id,name:id}));
+  await manager.loadCapacity();
+  const rows=manager.capacityRows.value;
+  expect(rows[0]).toMatchObject({planName:'plan-a',min:8,windowHours:8,pctMin:80});
+  expect(rows[1]).toMatchObject({planName:'plan-b',min:4,windowHours:4,pctMin:80});
+  expect(rows[2]).toMatchObject({planName:'Niet vastgesteld',pctMin:null});expect(rows[2].warning.join()).toContain('lookupsleutel');
+  expect(fetch.mock.calls.filter(([url])=>url.includes('/workplans/plan-a'))).toHaveLength(1);
+  manager.capacityWeek.value='2026-11-02';await manager.loadCapacity();
+  expect(manager.capacityRows.value[0].planName).toBe('plan-b');expect(manager.capacityRows.value[1].planName).toBe('plan-a');
+});
+it('toont geen dekking als Work Plan-details niet kunnen worden opgehaald',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async(input: string)=>{
+    if(input.endsWith('/agents/workplans/query'))return json({result:{referenceStartWeekDate:'2026-11-09',entities:[{user:{id:'employee-a'},workPlanLookupKeysPerWeek:[0]}],workPlanLookup:{'0':{id:'plan-a'}}}});
+    if(input.includes('/workplans/'))return new Response('{}',{status:403});return json({entities:[]});
+  }));
+  manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.capacityWeek.value='2026-11-09';manager.agents.value=[{id:'employee-a',name:'A'}];await manager.loadCapacity();
+  expect(manager.capacityRows.value[0].pctMin).toBeNull();expect(manager.capacityRows.value[0].warning.join()).toContain('403');
+});

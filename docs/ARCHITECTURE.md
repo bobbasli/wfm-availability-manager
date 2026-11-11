@@ -11,7 +11,7 @@ Vite base `./` ondersteunt het projectpad. De repository-URL op github.com is ge
 - `src/App.vue` is voorlopig het complete scherm (kalender, dialog, capaciteit). Nog opsplitsen.
 - `src/composables/useAvailabilityManager.js` bevat de bestaande UI- en domeinlogica; legacy, wordt incrementeel gemigreerd.
 - `src/services/genesysApi.ts` bevat de centrale authenticated HTTP-client en paginering.
-- `src/services/workforceManagement.ts` bevat de weekgebonden Work Plan-query; assignments blijven onbevestigd tot contractvalidatie.
+- `src/services/workforceManagement.ts` bevat de weekgebonden Work Plan-query; met strikt gevalideerde weeklookup en cache voor detailrequests.
 - `src/types/genesys.ts` definieert de eerste domeintypes.
 - `src/style.css`, Tailwind- en PostCSS-configuratie verzorgen styling.
 
@@ -23,7 +23,7 @@ Capaciteit: geselecteerde MU + ISO-week -> Work Plans -> weekgebonden Work Plan-
 Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De huidige implementatie bewaart het token voor de tab in `sessionStorage`; nooit tokens of client secrets loggen/commiten. OAuth `state` en PKCE verifier. Beperk OAuth scopes tot werkelijk noodzakelijke machtigingen en controleer per endpoint. De API-client bevat diagnose-informatie: deel die niet publiek zonder redactie.
 
 ## TODO voor Codex
-1. Bouw en bevestig werkelijke Genesys-response van `agents/workplans/query`; maak fixtures, tests en betrouwbare assignment-parser inclusief week/rotatie.
+1. Valideer de geïmplementeerde weeklookup met live Genesys-gegevens, inclusief rotaties, overrides en historische planversies. Synthetische fixtures dekken meerdere medewerkers/weken en ongeldige mappings.
 2. Split editor, weektijdlijn, roosterselectie en capaciteitstabel naar SFCs, composables en services.
 3. Migreer legacy JS naar strikte TS (schakel `allowJs` en `checkJs` uiteindelijk uit/aan conform einddoel).
 4. Unit-tests voor tijdzone DST (zomer-/wintertijd), nachtshift, overlap, flexuren, marge, planwijziging en ambiguïteit.
@@ -38,3 +38,5 @@ Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De hui
 - De legacy JS-composable blijft incrementeel te migreren; `strict: true` betekent niet dat deze JS volledig wordt gecontroleerd.
 - Verzoeken hebben selectie-/sessiecontroles vóór resultaten worden toegepast. Een gewijzigde medewerker of datum sluit de editor; gewijzigde week/marge wist capaciteit.
 - `npm test` test synthetische scenario’s voor tijdzones, API-fouten, PKCE, selectieconflicten en bevestigde editormutaties. Dit vervangt geen live Genesys-acceptatie.
+
+Work Plan-dataflow: `user.id` → kalenderweekindex vanaf `referenceStartWeekDate` → numerieke sleutel in `workPlanLookupKeysPerWeek` → `workPlanLookup` → expliciet plan-ID → gevalideerde detailresponse via de centrale client. De MU-/refreshgebonden detailcache deelt promises; ontbrekende of ongeldige mappings krijgen per rij een melding zonder percentage.
