@@ -13,3 +13,8 @@
 - Multi-tenant, geen vaste contracturen of dagpatronen; flexwerk, variabele uren, weekgebonden wijzigingen, nachtdiensten, weekenddagen en mogelijke rotaties moeten ook passen.
 - Eerst functionaliteit en regressies testen in de Genesys-omgeving, daarna uitrollen. Geen commando's of deploys die live data ongemerkt wijzigen.
 - Releases voorzien van versie, changelog, overzicht wijzigingen, tests en bekende beperkingen. Documentatie blijvend bruikbaar voor Codex zonder gespreksgeschiedenis.
+
+- Herstelronde v0.2.0: Work Plan-assignment-herkenning is bewust uitgeschakeld totdat het weekgebonden responsecontract is geverifieerd. Geen terugval op agentvelden, planlijsten of herkenbare losse IDs.
+- Sessies zijn aan regio en client gebonden. Een ontbrekende binding vraagt opnieuw aanmelden; dit voorkomt hergebruik van een token bij een gewijzigde URL-configuratie.
+- Alleen exacte expliciete publicatiestatussen worden geaccepteerd. Onbekende status blijft ongeschikt voor presentatie als gepubliceerd rooster.
+- CI draait tests en build op PR’s naar main; alleen een push naar main publiceert. Een handmatige workflowstart bouwt en test uitsluitend. Deze herstelronde publiceert niets.

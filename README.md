@@ -30,6 +30,14 @@ Verbind Codex met deze repository en verwijs naar `AGENTS.md`. Start je werk van
 `src/App.vue` houdt voorlopig de bestaande interface bij elkaar; `src/composables/useAvailabilityManager.js` bevat nog legacy JS. `src/services/genesysApi.ts` is de centrale API-client, `src/services/workforceManagement.ts` bevat de voorlopige Work Plan-toewijzingsparser. `src/types/genesys.ts` bevat strict-TS type-definities. Nieuwe code zoveel mogelijk in TypeScript en afzonderlijke componenten/composables.
 
 ## Tests en beperkingen
-Lokaal optioneel: `npm install`, `npm run typecheck`, `npm run build`. Geen Node-installatie op je Windows-pc vereist: GitHub Actions voert deze stappen uit. De GitHub Actions workflow gebruikt voorlopig `npm install` omdat een gevalideerd `package-lock.json` ontbreekt; lockfile genereren en overstappen op `npm ci` is een vervolgstap.
+Lokaal: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`. Gebruik Node.js 22 (zie `.nvmrc`). Geen Node-installatie op je Windows-pc vereist: GitHub Actions voert deze stappen uit. GitHub Actions installeert reproduceerbaar via `npm ci` en voert regressietests, de statische migratiecheck en de productiebuild uit.
 
-**Openstaand:** de echte response-vorm van `POST .../agents/workplans/query` is nog niet geverifieerd. Onbekende mapping leidt bewust tot geen capaciteitspercentage. Een groene build bewijst geen juiste API-scopes, OAuth redirect of werkend scenario in Genesys.
+**Openstaand:** de echte response-vorm van `POST .../agents/workplans/query` is nog niet geverifieerd. Zolang dit contract niet met productiegegevens is geverifieerd, worden alle toewijzingen als ‘Niet vastgesteld’ behandeld en geen capaciteitspercentages getoond. Herkenbare IDs alleen zijn geen bewijs voor week, rotatie, override of planversie. Een groene build bewijst geen juiste API-scopes, OAuth redirect of werkend scenario in Genesys.
+
+## Herstelronde v0.2.0 (nog niet uitgebracht)
+- Regio’s zijn beperkt tot ondersteunde Genesys Cloud-domeinen. Sessies zijn aan regio en OAuth-client gebonden; na deze wijziging is opnieuw aanmelden nodig voor bestaande sessies.
+- Oude responses worden bij selectiewijzigingen genegeerd. Een editor sluit als medewerker of datumbereik verandert.
+- Kalenderquery’s gebruiken Amsterdamse daggrenzen. Dienststarts gebruiken lokale kloktijden, ook rond de DST-overgang; ongeldige of dubbelzinnige tijden worden geweigerd.
+- Alleen expliciet gepubliceerde roosters worden getoond. Een fout bij Unavailable Times blokkeert de leesbare roosterweergave niet.
+- Capaciteitsresultaten vervallen bij een gewijzigde week of marge; ongeverifieerde Work Plans geven geen percentages.
+- Tests gebruiken uitsluitend synthetische gegevens. PKCE, permissies, responsecontracten en editorwijzigingen moeten vóór productie ook in een geschikte Genesys-testomgeving worden gecontroleerd.

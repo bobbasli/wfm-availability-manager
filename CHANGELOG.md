@@ -1,5 +1,13 @@
 # Changelog
 
+## Nog niet uitgebracht
+- Hersteld: verouderde responses bij medewerker-/MU-wissels en verkeerde koppeling tussen editor en medewerker.
+- Beveiligd: exacte regiovalidatie, sessiebinding aan OAuth-client/regio, centrale tokenuitwisseling en opruimen bij 401.
+- Hersteld: Amsterdamse querygrenzen, lokale shiftstarts rond DST en exacte publicatiestatuscontrole.
+- Work Plan-toewijzingen blijven nu volledig onbevestigd totdat het productiecontract inclusief week/rotatie/override/planversie is gevalideerd.
+- Toegevoegd: getypeerde tijd-/capaciteitshelpers, dialoogfocusbeheer, regressietests, lockfile en CI met npm ci.
+- Live Genesys-acceptatie is nog niet uitgevoerd.
+
 ## 0.2.0 — 2026-11-11
 - Project opgezet voor repository `bobbasli/wfm-availability-manager`, Vue 3 Composition API, Vite, TypeScript-services en Tailwind CSS.
 - Centrale Genesys HTTP-client en eerste Work Plan-query-service.

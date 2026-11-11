@@ -28,3 +28,8 @@ Work Plan details kunnen onder meer `weeklyExactPaidMinutes`, `weeklyMinimumPaid
 
 ## Capaciteitsmodel (concept)
 Zichtbaar: bruto mogelijke inzetvensters, Unavailable Time-overlap, netto vensters, betaalde uren (exact/range), flexmarge (standaard 25%), indicatieve normdekking. Shiftvensters vormen een **envelop** die onmogelijke combinaties kan omvatten; geen hard roosteradvies. Houd rekening met lokale tijd Europe/Amsterdam en grensgevallen rond DST en nachtdiensten.
+
+## Veilige grens tijdens de contractvalidatie
+De query blijft beschikbaar voor diagnose, maar de service retourneert voorlopig **geen bevestigde assignments**, ongeacht herkenbare IDs of datums. Er is nog geen geverifieerd productie-schema voor effectieve weken, rotaties, overrides en planversies. Een parser uitbreiden met gegokte veldnamen is geen oplossing. Activeer capaciteitstoewijzingen pas na geanonimiseerde fixtures van meerdere medewerkers en weken, inclusief afwijkingen en conflicten, met bijbehorende tests.
+
+De centrale HTTP-module voert ook de OAuth-tokenuitwisseling uit. Alleen expliciet ondersteunde regiodomeinen zijn toegestaan; toegangstokens worden niet hergebruikt bij een andere regio of client. Paginering weigert onbekende responses en meldt de limiet van 50 pagina’s als fout. Rate limits blijven zichtbaar; mutaties worden nooit automatisch herhaald.

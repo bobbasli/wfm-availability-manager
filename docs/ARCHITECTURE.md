@@ -11,7 +11,7 @@ Vite base `./` ondersteunt het projectpad. De repository-URL op github.com is ge
 - `src/App.vue` is voorlopig het complete scherm (kalender, dialog, capaciteit). Nog opsplitsen.
 - `src/composables/useAvailabilityManager.js` bevat de bestaande UI- en domeinlogica; legacy, wordt incrementeel gemigreerd.
 - `src/services/genesysApi.ts` bevat de centrale authenticated HTTP-client en paginering.
-- `src/services/workforceManagement.ts` bevat een voorlopige, defensieve interpretatie van de weekgebonden Work Plan-response.
+- `src/services/workforceManagement.ts` bevat de weekgebonden Work Plan-query; assignments blijven onbevestigd tot contractvalidatie.
 - `src/types/genesys.ts` definieert de eerste domeintypes.
 - `src/style.css`, Tailwind- en PostCSS-configuratie verzorgen styling.
 
@@ -28,4 +28,13 @@ Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De hui
 3. Migreer legacy JS naar strikte TS (schakel `allowJs` en `checkJs` uiteindelijk uit/aan conform einddoel).
 4. Unit-tests voor tijdzone DST (zomer-/wintertijd), nachtshift, overlap, flexuren, marge, planwijziging en ambiguïteit.
 5. Controleer API-paginering, 401/token expiry, ongeautoriseerde states en race conditions bij wisselen van MU.
-6. Voeg lockfile toe en switch GitHub Actions van `npm install` naar `npm ci` zodra dependency-resolutie kan draaien.
+6. Lockfile en `npm ci` zijn toegevoegd; onderhoud dependencies via gecontroleerde lockfile-updates.
+
+## Geteste herstelgrenzen
+- `src/domain/time.ts`: Amsterdamse kloktijdconversie, lokale daggrenzen en exacte publicatiestatus.
+- `src/domain/capacity.ts`: gevalideerde betaalde uren, DST-veilige inzetvensters, intervalvereniging en overlap.
+- `src/services/regions.ts` / `oauth.ts`: exacte regiodomeinen en PKCE-verzoekopbouw.
+- `src/composables/useDialogFocus.ts`: focusplaatsing, focusbegrenzing en terugkeer naar de trigger.
+- De legacy JS-composable blijft incrementeel te migreren; `strict: true` betekent niet dat deze JS volledig wordt gecontroleerd.
+- Verzoeken hebben selectie-/sessiecontroles vóór resultaten worden toegepast. Een gewijzigde medewerker of datum sluit de editor; gewijzigde week/marge wist capaciteit.
+- `npm test` test synthetische scenario’s voor tijdzones, API-fouten, PKCE, selectieconflicten en bevestigde editormutaties. Dit vervangt geen live Genesys-acceptatie.
