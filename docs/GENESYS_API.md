@@ -38,7 +38,9 @@ Request-body uit Genesys API Explorer:
 
 Work Plan details kunnen onder meer `weeklyExactPaidMinutes`, `weeklyMinimumPaidMinutes`, `weeklyMaximumPaidMinutes`, `flexibleWeeklyPaidTime`, `maximumDays`, `optionalDays.values`, `shifts`, `days.values`, starttijdgrenzen, betaald/onbetaald bevatten. Het `agents`-veld van de Work Plan-lijst kan leeg zijn: **niet** interpreteren als bewijs voor geen assignments.
 
-## Capaciteitsmodel (concept)
-Zichtbaar: bruto mogelijke inzetvensters, Unavailable Time-overlap, netto vensters, betaalde uren (exact/range), flexmarge (standaard 25%), indicatieve normdekking. Shiftvensters vormen een **envelop** die onmogelijke combinaties kan omvatten; geen hard roosteradvies. Houd rekening met lokale tijd Europe/Amsterdam en grensgevallen rond DST en nachtdiensten.
+## Capaciteitsmodel v0.2.1
+De huidige en vorige geselecteerde week worden afzonderlijk met `weekCount: 1` opgevraagd. Dezelfde MU-/refreshgebonden detailcache wordt voor beide toewijzingen gebruikt. De vorige toewijzing is uitsluitend context om inkomende nachtdiensten te detecteren; zij vervangt nooit een ontbrekende huidige toewijzing.
+
+Maximaal planbare betaalde uren komen uit volledige geldige diensten en combinaties, niet uit de union van vensters minus onbeschikbaarheid. De venster- en overlapkolommen blijven beschrijvend. Onbetaalde activiteiten verlengen de dienst maar verhogen de betaalde uren niet. Ongedocumenteerde regels en onvoldoende weekgrenscontext geven geen bewezen maximum of percentage. Zie [de ondersteunde SDK-velden en beperkingen](CAPACITY_V021.md).
 
 De centrale HTTP-module voert ook de OAuth-tokenuitwisseling uit. Alleen expliciet ondersteunde regiodomeinen zijn toegestaan; toegangstokens worden niet hergebruikt bij een andere regio of client. Paginering weigert onbekende responses en meldt de limiet van 50 pagina’s als fout. Rate limits blijven zichtbaar; mutaties worden nooit automatisch herhaald.

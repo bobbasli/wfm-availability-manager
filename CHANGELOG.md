@@ -1,6 +1,16 @@
 # Changelog
 
-## Nog niet uitgebracht
+## 0.2.1 — in ontwikkeling
+- Vervangen: vensteruren/contracturen met 25% opslag door maximaal planbare betaalde uren uit volledige dienstcombinaties; dekking maximaal 100%.
+- Toegevoegd: pure TypeScript-berekening voor vaste/flexibele uren, startstappen, maximale werkdagen, expliciete optionele/verplichte dagen, vaste betaalde/onbetaalde activiteiten en onbeschikbaarheid.
+- Gescheiden kwalitatieve inzetflexibiliteit op basis van dagen, starts en geldige indelingen, met reproduceerbare uitleg.
+- Nieuwe tienkolomstabel en aanklikbare medewerkerdetails, met onbeschikbaarheid, regels, kandidaatdiensten, redenen en een niet-officieel voorbeeld.
+- Huidige/vorige weektoewijzingen delen dezelfde detailcache; ontbrekende of grensoverschrijdende context geeft expliciet ‘Niet vast te stellen’.
+- Begrensde exacte zoekruimte: bij onbekende regels of limietoverschrijding geen schijnmaximum, percentage of rooster.
+- Bestaande editor, roosters en OAuth behouden; PR-controles gelden ook voor ontwikkelbranches. Geen automatische merge of deployment.
+- Nieuwe unit-/componenttests en technische documentatie: `docs/CAPACITY_V021.md`.
+
+## Herstelronde 0.2.0
 - Hersteld: verouderde responses bij medewerker-/MU-wissels en verkeerde koppeling tussen editor en medewerker.
 - Beveiligd: exacte regiovalidatie, sessiebinding aan OAuth-client/regio, centrale tokenuitwisseling en opruimen bij 401.
 - Hersteld: Amsterdamse querygrenzen, lokale shiftstarts rond DST en exacte publicatiestatuscontrole.

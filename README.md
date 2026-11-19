@@ -1,6 +1,6 @@
-# WFM Availability Manager — v0.2.0
+# WFM Availability Manager — v0.2.1
 
-Vue 3 Composition API + TypeScript-services + Vite + Tailwind CSS. Browsergebaseerde Genesys Cloud Supervisor Client App: Unavailable Times-editor, gepubliceerd rooster en indicatief capaciteitsoverzicht. **Nog in migratie/test; niet direct productiegeschikt verklaren.**
+Vue 3 Composition API + TypeScript-services + Vite + Tailwind CSS. Browsergebaseerde Genesys Cloud Supervisor Client App: Unavailable Times-editor, gepubliceerd rooster en gescheiden planbaarheid en inzetflexibiliteit. **Nog in migratie/test; niet direct productiegeschikt verklaren.**
 
 ## Jouw GitHub repository
 - Broncode: https://github.com/bobbasli/wfm-availability-manager
@@ -34,10 +34,14 @@ Lokaal: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`. Gebruik Node
 
 **Work Plan-toewijzing:** de app gebruikt het door de gebruiker opgegeven weeklookupcontract: `result.entities[].user.id`, `workPlanLookupKeysPerWeek`, `referenceStartWeekDate` en `workPlanLookup`. Per medewerker wordt uitsluitend de sleutel voor de gekozen week gebruikt. Ontbrekende of ongeldige toewijzingen blijven ‘Niet vastgesteld’, zonder percentage. Details worden per plan-ID en refresh gecachet. Live controle van rotaties, overrides en planversies blijft nodig; een groene build bewijst geen juiste API-scopes of live gegevens.
 
-## Herstelronde v0.2.0 (nog niet uitgebracht)
-- Regio’s zijn beperkt tot ondersteunde Genesys Cloud-domeinen. Sessies zijn aan regio en OAuth-client gebonden; na deze wijziging is opnieuw aanmelden nodig voor bestaande sessies.
-- Oude responses worden bij selectiewijzigingen genegeerd. Een editor sluit als medewerker of datumbereik verandert.
-- Kalenderquery’s gebruiken Amsterdamse daggrenzen. Dienststarts gebruiken lokale kloktijden, ook rond de DST-overgang; ongeldige of dubbelzinnige tijden worden geweigerd.
-- Alleen expliciet gepubliceerde roosters worden getoond. Een fout bij Unavailable Times blokkeert de leesbare roosterweergave niet.
-- Capaciteitsresultaten vervallen bij een gewijzigde week of marge; ongeverifieerde Work Plans geven geen percentages.
-- Tests gebruiken uitsluitend synthetische gegevens. PKCE, permissies, responsecontracten en editorwijzigingen moeten vóór productie ook in een geschikte Genesys-testomgeving worden gecontroleerd.
+## Capaciteit & beschikbaarheid v0.2.1
+
+De tab vergelijkt geen vrije vensteruren meer met contracturen plus 25%. Een exacte, begrensde TypeScript-berekening zoekt combinaties van volledige geldige diensten binnen de ondersteunde Work Plan-regels, maximale werkdagen en Unavailable Times. Planbaarheid wordt op 100% begrensd; flexibele weekuren tonen het vereiste minimum en toegestane maximum afzonderlijk.
+
+Voorbeeld: 24 contracturen en 65 mogelijke vensteruren geven maximaal 24 betaalde uren en 100% dekking, niet 216,7% capaciteit. Een blokkade van één uur midden in een vaste dienst van acht uur verwijdert die dienst volledig, in plaats van zeven uur over te houden.
+
+Flexibiliteit is een afzonderlijke, uitlegbare kwalitatieve indicatie op basis van mogelijke werkdagen, starttijden en geldige contractindelingen. Klik op een medewerker voor regels, vensters, onbeschikbaarheid, kandidaatdiensten en een eventuele voorbeeldindeling. Een voorbeeld is geen gepubliceerd Genesys-rooster en wordt nooit opgeslagen.
+
+Bij onbekende of ontbrekende regels, ontbrekende vorige-week-context, weekgrensproblemen of een zoeklimiet staat er **Niet vast te stellen**, zonder percentage of bewezen uurmaximum. Onder meer flexibele pauzeplaatsing, periode-/weekendregels en aanvullende rustregels zijn nog niet volledig ondersteund. Zie [de berekeningsmethode, voorbeelden en beperkingen](docs/CAPACITY_V021.md).
+
+De bestaande OAuth PKCE, BU/MU/medewerkerselectie, Unavailable Times-editor en alleen-lezen gepubliceerde roosters blijven behouden. Automatische tests gebruiken alleen synthetische gegevens; live acceptatie blijft nodig. Deze wijziging wordt uitsluitend op een ontwikkelbranch aangeboden en wordt niet automatisch naar productie uitgerold.

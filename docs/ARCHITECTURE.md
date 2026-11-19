@@ -1,4 +1,4 @@
-# Architectuur — v0.2.0
+# Architectuur — v0.2.1
 
 ## Hosting / releaseproces
 Repository: https://github.com/bobbasli/wfm-availability-manager
@@ -17,7 +17,7 @@ Vite base `./` ondersteunt het projectpad. De repository-URL op github.com is ge
 
 ## Dataflow
 OAuth PKCE -> token in sessionStorage -> Genesys API-client -> BU/MU/agent -> Unavailable Times en gepubliceerd rooster -> Vue presentatie.
-Capaciteit: geselecteerde MU + ISO-week -> Work Plans -> weekgebonden Work Plan-assignments per agent -> dienstvensters -> overlap met Unavailable Times -> indicatief dekkingspercentage. Fout/onbekend -> expliciete waarschuwing en geen percentage.
+Capaciteit: geselecteerde MU + week -> huidige en vorige weektoewijzing per user.id -> gedeelde Work Plan-detailcache -> Unavailable Times -> gevalideerde volledige kandidaatdiensten -> exacte combinaties binnen dag-/weekgrenzen -> maximaal betaalde uren en minimumdekking (maximaal 100%). Flexibiliteit wordt afzonderlijk bepaald. Fout/onbekend -> expliciete waarschuwing en geen percentage.
 
 ## Security
 Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De huidige implementatie bewaart het token voor de tab in `sessionStorage`; nooit tokens of client secrets loggen/commiten. OAuth `state` en PKCE verifier. Beperk OAuth scopes tot werkelijk noodzakelijke machtigingen en controleer per endpoint. De API-client bevat diagnose-informatie: deel die niet publiek zonder redactie.
@@ -26,7 +26,7 @@ Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De hui
 1. Valideer de geïmplementeerde weeklookup met live Genesys-gegevens, inclusief rotaties, overrides en historische planversies. Synthetische fixtures dekken meerdere medewerkers/weken en ongeldige mappings.
 2. Split editor, weektijdlijn, roosterselectie en capaciteitstabel naar SFCs, composables en services.
 3. Migreer legacy JS naar strikte TS (schakel `allowJs` en `checkJs` uiteindelijk uit/aan conform einddoel).
-4. Unit-tests voor tijdzone DST (zomer-/wintertijd), nachtshift, overlap, flexuren, marge, planwijziging en ambiguïteit.
+4. Unit-tests voor tijdzone DST (zomer-/wintertijd), nachtshift, overlap, flexuren, planwijziging en ambiguïteit.
 5. Controleer API-paginering, 401/token expiry, ongeautoriseerde states en race conditions bij wisselen van MU.
 6. Lockfile en `npm ci` zijn toegevoegd; onderhoud dependencies via gecontroleerde lockfile-updates.
 
@@ -36,7 +36,14 @@ Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De hui
 - `src/services/regions.ts` / `oauth.ts`: exacte regiodomeinen en PKCE-verzoekopbouw.
 - `src/composables/useDialogFocus.ts`: focusplaatsing, focusbegrenzing en terugkeer naar de trigger.
 - De legacy JS-composable blijft incrementeel te migreren; `strict: true` betekent niet dat deze JS volledig wordt gecontroleerd.
-- Verzoeken hebben selectie-/sessiecontroles vóór resultaten worden toegepast. Een gewijzigde medewerker of datum sluit de editor; gewijzigde week/marge wist capaciteit.
+- Verzoeken hebben selectie-/sessiecontroles vóór resultaten worden toegepast. Een gewijzigde medewerker of datum sluit de editor; gewijzigde week of medewerkerlijst wist capaciteit.
 - `npm test` test synthetische scenario’s voor tijdzones, API-fouten, PKCE, selectieconflicten en bevestigde editormutaties. Dit vervangt geen live Genesys-acceptatie.
 
 Work Plan-dataflow: `user.id` → kalenderweekindex vanaf `referenceStartWeekDate` → numerieke sleutel in `workPlanLookupKeysPerWeek` → `workPlanLookup` → expliciet plan-ID → gevalideerde detailresponse via de centrale client. De MU-/refreshgebonden detailcache deelt promises; ontbrekende of ongeldige mappings krijgen per rij een melding zonder percentage.
+
+## v0.2.1
+- `src/domain/plannability.ts`: pure TypeScript-solver met expliciete regelvalidatie, begrensde enumeratie/dynamische toestanden, betaalde uren, onbekendheidsredenen en aparte flexibiliteitsindicator.
+- `src/composables/useCapacity.ts`: strikt getypeerde data-ophaling, huidige/vorige weekcontext, detailcache en bescherming tegen verouderde selecties. API-verzoeken blijven via `genesysApi.ts` lopen.
+- `src/components/CapacityTable.vue`: nieuwe tienkolomstabel en toegankelijk detailvenster met focusbeheer, Escape en focusherstel.
+- De overige legacy UI-logica wordt niet herschreven. `capacity.ts` levert hergebruikte interval-/urenhelpers; zijn oude vensterenvelop is geen planningsbewijs en voedt de nieuwe planbaarheid niet.
+- Zie [CAPACITY_V021.md](CAPACITY_V021.md) voor ondersteunde regels, rekengrenzen, voorbeelden en resterende beperkingen.

@@ -1,10 +1,9 @@
+import { useCapacity } from './useCapacity';
 import { createPkceRequest } from '../services/oauth';
-import { workPlanHours, workPlanWindows, unionIntervals, intervalHours, intersectionHours } from '../domain/capacity';
 import { localParts, amsterdamToUtc, localDayBounds, isPublished } from '../domain/time';
 import { validateRegion } from '../services/regions';
 import { ref, computed, onMounted, watch } from 'vue';
 import { createGenesysApi, exchangeOAuthCode } from '../services/genesysApi';
-import { queryAgentWorkPlans, createWorkPlanDetailsLoader } from '../services/workforceManagement';
 
 const redirect = location.origin + location.pathname;
 const qs = new URLSearchParams(location.search);
@@ -33,86 +32,10 @@ export function useAvailabilityManager(){
     const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
     // Separate weekly MU capacity view. Read-only, never changes agent availability.
     const activeTab=ref('calendar');
-    const capacityWeek=ref(iso(monday));
-    const capacityBusy=ref(false),capacityProgress=ref(''),capacityRows=ref([]),capacityError=ref('');
-    const capacityDiagnostics=ref([]);
+    const {capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity}=useCapacity({businessUnit,managementUnit,token,agents,request:(...args)=>api(...args)});
     watch([businessUnit,managementUnit,agentId,start,end,region,token],()=>{selectionVersion++;closeEditor();lastResponse.value=null;scheduleData.value=null;busy.value=false;scheduleBusy.value=false;}, {flush:'sync'});
-    let capacityVersion=0;
-    watch([businessUnit,managementUnit,capacityWeek,region,token],()=>{capacityVersion++;capacityRows.value=[];capacityProgress.value='Selectie gewijzigd; haal het overzicht opnieuw op.';}, {flush:'sync'});
-    const capacityMargin=ref(Math.min(100,Math.max(0,Number(localStorage.getItem('wfm_capacity_margin')??25)||0)));
-    watch(capacityMargin,v=>{capacityVersion++;capacityRows.value=[];capacityProgress.value='Marge gewijzigd; haal het overzicht opnieuw op.';if(typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=100)localStorage.setItem('wfm_capacity_margin',String(v));},{flush:'sync'});
     const hoursText=n=>Number.isFinite(n)?(Math.round(n*100)/100).toLocaleString('nl-NL',{maximumFractionDigits:2})+' u':'—';
     const pctText=n=>Number.isFinite(n)?(Math.round(n*10)/10).toLocaleString('nl-NL',{maximumFractionDigits:1})+'%':'—';
-    function mondayDate(date){const d=new Date(date+'T12:00:00Z');if(!Number.isFinite(+d))return null;d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return iso(d);}
-    function weeklyBounds(){const week=mondayDate(capacityWeek.value);if(!week)throw Error('Kies een geldige week.');const d=new Date(week+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+7);return {week,next:iso(d)};}
-    function unavailableIntervals(response,week,next){
-      const list=Array.isArray(response)?response:(response?.entities??response?.unavailableTimes??response?.results??response?.items);
-      if(!Array.isArray(list))throw Error('Onbekende Unavailable Times-response.');
-      const start=amsterdamToUtc(week+'T00:00'),end=amsterdamToUtc(next+'T00:00');
-      const intervals=[];
-      for(const item of list){
-        const span=item?.timeSpan??item;
-        const a=Date.parse(span?.startDate);let b=Date.parse(span?.endDate);
-        if(!Number.isFinite(b)&&Number.isFinite(Number(span?.lengthMinutes)))b=a+Number(span.lengthMinutes)*60000;
-        if(!Number.isFinite(a)||!Number.isFinite(b)||b<a)throw Error('Ongeldig tijdvak ontvangen.');
-        intervals.push([Math.max(start,a),Math.min(end,b)]);
-      }
-      return unionIntervals(intervals);
-    }
-    async function loadCapacity(){
-      if(capacityBusy.value||!managementUnit.value||!businessUnit.value||!token.value)return;
-      capacityBusy.value=true;capacityError.value='';capacityRows.value=[];capacityDiagnostics.value=[];
-      const mu=managementUnit.value,bu=businessUnit.value;
-      let operationVersion=capacityVersion;
-      try{
-        const {week,next}=weeklyBounds();capacityWeek.value=week;
-        if(typeof capacityMargin.value!=='number'||!Number.isFinite(capacityMargin.value)||capacityMargin.value<0||capacityMargin.value>100)throw Error('Kies een marge tussen 0 en 100%.');
-        const version=capacityVersion,margin=capacityMargin.value;operationVersion=version;
-        const current=()=>version===capacityVersion;
-        const roster=[...agents.value];if(!roster.length){capacityProgress.value='Geen medewerkers gevonden.';return;}
-        capacityProgress.value='Work Plans ophalen…';
-        let assignmentByAgent=new Map(),assignmentWarnings=new Map();
-        try{
-          const response=await queryAgentWorkPlans(api,mu,roster.map(agent=>agent.id),week);
-          if(!current())return;
-          assignmentByAgent=response.assignments;assignmentWarnings=response.warnings;
-          if(response.warning)capacityDiagnostics.value.push(response.warning);
-        }catch(e){if(!current())return;capacityDiagnostics.value.push(`Work Plan-toewijzingen: ${e.message}`);}
-        const results=new Array(roster.length);let index=0;
-        const detailedPlan=createWorkPlanDetailsLoader(api,mu);
-        async function worker(){
-          while(index<roster.length){const i=index++,agent=roster[i];
-            if(!current())return;
-            const row={id:agent.id,name:agent.name||agent.id,planName:'Niet vastgesteld',min:null,max:null,unavailable:null,windowHours:null,available:null,requiredMin:null,requiredMax:null,pctMin:null,pctMax:null,maxDays:null,warning:[]};
-            try{
-              const planId=assignmentByAgent.get(agent.id);
-              if(planId){const detailPlan=await detailedPlan(planId);const hours=workPlanHours(detailPlan);row.planName=detailPlan.name||'Work Plan';row.maxDays=detailPlan.maximumDays??null;if(hours){row.min=hours.min;row.max=hours.max;}else row.warning.push('Werkuren ontbreken in Work Plan');const windows=workPlanWindows(detailPlan,week,next);row._windows=windows.intervals;row.windowHours=intervalHours(windows.intervals);if(windows.warning)row.warning.push(windows.warning);}
-              else row.warning.push(assignmentWarnings.get(agent.id)||'Geen geldige Work Plan-toewijzing voor deze medewerker en week.');
-            }catch(e){row.warning.push('Work Plan: '+e.message);}
-            try{
-              // Include offset padding for time spans that overlap a local week boundary.
-              const from=new Date(week+'T00:00:00Z');from.setUTCDate(from.getUTCDate()-1);
-              const to=new Date(next+'T00:00:00Z');to.setUTCDate(to.getUTCDate()+1);
-              const response=await api(`/api/v2/workforcemanagement/agents/${encode(agent.id)}/unavailabletimes/query`,'POST',{startDate:from.toISOString(),endDate:to.toISOString()});
-              const unavailable=unavailableIntervals(response,week,next);row.unavailable=intervalHours(unavailable);if(row._windows){row.blockedWithinWindows=intersectionHours(row._windows,unavailable);row.available=Math.max(0,row.windowHours-row.blockedWithinWindows);}
-            }catch(e){row.warning.push('Niet beschikbaar: '+e.message);}
-            if(row.min!==null&&row.max!==null&&row.available!==null){
-              const factor=1+margin/100;
-              row.requiredMin=row.min*factor;row.requiredMax=row.max*factor;
-              const coverage=required=>required>0?row.available/required*100:null;
-              row.pctMin=coverage(row.requiredMax);row.pctMax=coverage(row.requiredMin);
-            }
-            delete row._windows;
-            if(!current())return;
-            results[i]=row;capacityRows.value=results.filter(Boolean);capacityProgress.value=`${capacityRows.value.length} van ${roster.length} medewerkers verwerkt`;
-          }
-        }
-        await Promise.all(Array.from({length:Math.min(4,roster.length)},()=>worker()));
-        if(!current())return;
-        capacityProgress.value=`${capacityRows.value.length} medewerkers geladen · week ${week}`;
-      }catch(e){if(operationVersion===capacityVersion)capacityError.value=e.message;}
-      finally{capacityBusy.value=false;}
-    }
     const activityCodes=ref([]),activityCodeError=ref('');
     const activityCodeMap=computed(()=>new Map((Array.isArray(activityCodes.value)?activityCodes.value:[]).filter(c=>c&&typeof c==='object'&&c.id!=null).map(c=>[String(c.id),c])));
     function codeColor(code){
@@ -359,7 +282,7 @@ export function useAvailabilityManager(){
       try{const me=await api('/api/v2/users/me');if(!valid())return;const units=await pages('/api/v2/workforcemanagement/businessunits');if(!valid())return;identity.value=me.name||'Aangemeld';businessUnits.value=units;setStatus(`${businessUnits.value.length} Business Unit(s) geladen.`);}
       catch(e){if(valid())setStatus(e.message,true);}finally{if(valid())busy.value=false;}
     }
-    function logout(){managementRequest++;agentsRequest++;unavailableRequest++;scheduleRequest++;capacityVersion++;busy.value=false;scheduleBusy.value=false;closeEditor();scheduleData.value=null;scheduleCandidates.value=[];scheduleDiagnostics.value=null;activityCodes.value=[];raw.value='Nog geen response.';sessionStorage.removeItem('wfm_auth_context');capacityRows.value=[];activeTab.value='calendar';token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
+    function logout(){managementRequest++;agentsRequest++;unavailableRequest++;scheduleRequest++;busy.value=false;scheduleBusy.value=false;closeEditor();scheduleData.value=null;scheduleCandidates.value=[];scheduleDiagnostics.value=null;activityCodes.value=[];raw.value='Nog geen response.';sessionStorage.removeItem('wfm_auth_context');capacityRows.value=[];activeTab.value='calendar';token.value='';sessionStorage.removeItem('wfm_token');identity.value='Niet aangemeld';businessUnits.value=[];businessUnit.value='';managementUnits.value=[];managementUnit.value='';agents.value=[];agentId.value='';lastResponse.value=null;setStatus('Afgemeld.');}
     function resetAgentData(){scheduleRequest++;scheduleBusy.value=false;busy.value=false;lastResponse.value=null;scheduleData.value=null;scheduleError.value='';scheduleCandidates.value=[];selectedSchedule.value='';scheduleDiagnostics.value=null;activityCodes.value=[];activityCodeError.value='';confirmed.value=false;closeEditor();if(agentId.value){loadUnavailable();discoverSchedules();}}
     async function loadManagementUnits(){
       capacityRows.value=[];managementUnit.value='';managementUnits.value=[];agents.value=[];agentId.value='';resetAgentData();
@@ -412,5 +335,5 @@ export function useAvailabilityManager(){
     watch([clientId,region],()=>{logout();saveConfig();},{flush:'sync'});
     watch([start,end],()=>{if(agentId.value){loadUnavailable();discoverSchedules();}});
     onMounted(async()=>{try{validateRegion(region.value);await callback();await initialize();}catch(e){sessionStorage.removeItem('wfm_pkce');sessionStorage.removeItem('wfm_state');sessionStorage.removeItem('wfm_oauth_context');setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {activeTab,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
 }

@@ -32,9 +32,8 @@ it('wist gevoelige gegevens bij uitloggen en bij regio-wijziging',()=>{
   expect(manager.raw.value).toBe('Nog geen response.');expect(manager.scheduleData.value).toBeNull();expect(sessionStorage.getItem('wfm_token')).toBeNull();
   manager.token.value='another-token';manager.region.value='mypurecloud.ie';expect(manager.token.value).toBe('');
 });
-it('wist oude capaciteitsresultaten zodra marge of week wijzigt',()=>{
-  manager.capacityRows.value=[{id:'old'}];manager.capacityMargin.value=30;expect(manager.capacityRows.value).toEqual([]);
-  manager.capacityRows.value=[{id:'old'}];manager.capacityWeek.value='2026-11-16';expect(manager.capacityRows.value).toEqual([]);
+it('wist oude capaciteitsresultaten zodra de week wijzigt',()=>{
+  manager.capacityRows.value=[{id:'old'}];manager.capacityWeek.value=manager.capacityWeek.value==='2030-01-07'?'2030-01-14':'2030-01-07';expect(manager.capacityRows.value).toEqual([]);
 });
 it('toont een kalender ook wanneer unavailable times ontbreken',()=>{
   manager.agentId.value='agent-one';expect(manager.scheduleRows.value.length).toBeGreaterThan(0);expect(manager.graphSupported.value).toBe(false);
@@ -99,16 +98,16 @@ it('berekent capaciteit met eigen weekplannen en haalt gedeelde details één ke
       {user:{id:'employee-c'},workPlanLookupKeysPerWeek:[null,null]},
       {user:{id:'employee-d'},workPlanLookupKeysPerWeek:[1,0]},
     ],workPlanLookup:{'0':{id:'plan-a'},'1':{id:'plan-b'}}}});
-    if(input.includes('/workplans/')){const id=input.split('/').at(-1),minutes=id==='plan-a'?480:240;return json({id,name:id,weeklyExactPaidMinutes:minutes,maximumDays:1,shifts:[{days:{values:['Monday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:minutes}]});}
+    if(input.includes('/workplans/')){const id=input.split('/').at(-1),minutes=id==='plan-a'?480:240;return json({id,name:id,weeklyExactPaidMinutes:minutes,maximumDays:1,optionalDays:{values:['Monday']},shifts:[{days:{values:['Monday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:minutes}]});}
     return json({entities:[]});
   });vi.stubGlobal('fetch',fetch);
   manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.capacityWeek.value='2026-11-09';
   manager.agents.value=['a','b','c','d'].map(id=>({id:'employee-'+id,name:id}));
   await manager.loadCapacity();
   const rows=manager.capacityRows.value;
-  expect(rows[0]).toMatchObject({planName:'plan-a',min:8,windowHours:8,pctMin:80});
-  expect(rows[1]).toMatchObject({planName:'plan-b',min:4,windowHours:4,pctMin:80});
-  expect(rows[2]).toMatchObject({planName:'Niet vastgesteld',pctMin:null});expect(rows[2].warning.join()).toContain('lookupsleutel');
+  expect(rows[0]).toMatchObject({planName:'plan-a',calculation:{contract:{min:8,max:8},windowHours:8,coverage:100,maxHours:8}});
+  expect(rows[1]).toMatchObject({planName:'plan-b',calculation:{contract:{min:4,max:4},windowHours:4,coverage:100,maxHours:4}});
+  expect(rows[2]).toMatchObject({planName:'Niet vastgesteld',calculation:{coverage:null,status:'Niet vast te stellen'}});expect(rows[2].calculation.reasons.join()).toContain('lookupsleutel');
   expect(fetch.mock.calls.filter(([url])=>url.includes('/workplans/plan-a'))).toHaveLength(1);
   manager.capacityWeek.value='2026-11-02';await manager.loadCapacity();
   expect(manager.capacityRows.value[0].planName).toBe('plan-b');expect(manager.capacityRows.value[1].planName).toBe('plan-a');
@@ -119,5 +118,5 @@ it('toont geen dekking als Work Plan-details niet kunnen worden opgehaald',async
     if(input.includes('/workplans/'))return new Response('{}',{status:403});return json({entities:[]});
   }));
   manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.capacityWeek.value='2026-11-09';manager.agents.value=[{id:'employee-a',name:'A'}];await manager.loadCapacity();
-  expect(manager.capacityRows.value[0].pctMin).toBeNull();expect(manager.capacityRows.value[0].warning.join()).toContain('403');
+  expect(manager.capacityRows.value[0].calculation.coverage).toBeNull();expect(manager.capacityRows.value[0].calculation.reasons.join()).toContain('403');
 });
