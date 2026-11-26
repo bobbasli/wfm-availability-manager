@@ -8,7 +8,7 @@ it('wijzigt marge, percentages en kleuren zonder enige nieuwe API-call',async()=
   localStorage.clear();
   const request=vi.fn(async(path:string,_method?:string,body?:unknown)=>{
     if(path.endsWith('/agents/workplans/query'))return {result:{referenceStartWeekDate:(body as {startDate:string}).startDate,entities:[{user:{id:'synthetic'},workPlanLookupKeysPerWeek:[0]}],workPlanLookup:{'0':{id:'plan'}}}};
-    if(path.endsWith('/workplans/plan'))return {id:'plan',weeklyExactPaidMinutes:1440,shifts:[{days:{values:['Monday','Tuesday','Wednesday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:480}]};
+    if(path.endsWith('/workplans/plan'))return {id:'plan',weeklyExactPaidMinutes:1440,shifts:[{days:{values:['Monday','Tuesday','Wednesday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:480,activities:[]}]};
     return {entities:[]};
   });
   const root=document.createElement('div');let state!:ReturnType<typeof useCapacity>;

@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { formatHistoryTimestamp } from '../domain/history';
 import { computed } from 'vue';
 import type { CapacityRow } from '../composables/useCapacity';
 import { assessPlanningSpace, type SpaceBoundary, type SpaceStatus } from '../domain/planningSpace';
 const props=defineProps<{rows:CapacityRow[];margin:unknown}>();
 const rows=computed(()=>props.rows.map(row=>({...row,assessment:assessPlanningSpace(row.space,props.margin)})));
 const hours=(value:number|null)=>value===null?'—':`${value.toLocaleString('nl-NL',{maximumFractionDigits:2})} uur`;
+const datetime=(value:number)=>formatHistoryTimestamp(new Date(value).toISOString());
 const percent=(value:number|null)=>value===null?'—':`${value.toLocaleString('nl-NL',{maximumFractionDigits:1})}%`;
 const classes:Record<SpaceStatus,string>={green:'text-emerald-700',orange:'text-amber-700',red:'text-red-700',unknown:'text-slate-500'};
 const tooltip=(value:SpaceBoundary)=>`${hours(value.paidHours)} betaald; ${hours(value.requiredHours)} benodigde ruimte. ${value.description}`;
@@ -49,4 +51,19 @@ const tooltip=(value:SpaceBoundary)=>`${hours(value.paidHours)} betaald; ${hours
     <div><strong>Kleurindicaties</strong><ul class="list-disc pl-5"><li>Groen: voldoende ruimte inclusief marge.</li><li>Oranje: voldoende ruimte voor de betaalde uren, maar onvoldoende marge.</li><li>Rood: onvoldoende ruimte voor de betaalde uren.</li></ul></div>
     <p class="italic">De planbaarheid is een indicator van de beschikbare tijdsruimte. Het is geen garantie dat Genesys Cloud daadwerkelijk een geldig rooster kan genereren. Hierbij spelen ook andere Work Plan-regels een rol, zoals maximale werkdagen, dienstlengtes en rusttijden.</p>
   </section>
+  <details class="text-sm text-slate-600 space-y-3">
+    <summary class="cursor-pointer font-semibold">Berekening inzetvensters per medewerker</summary>
+    <p>Betaalde dienstminuten omvatten alle betaalde activiteiten. Alleen expliciet onbetaalde activiteiten worden erbij opgeteld. Een pauze is geen geregistreerde onbeschikbaarheid. Vensters kunnen overlappen; de dagtotalen hieronder zijn al samengevoegd.</p>
+    <section v-for="row in rows" :key="row.id" class="border-t border-slate-200 py-3 space-y-2">
+      <h4 class="font-semibold">{{row.name}} · {{row.planName}}</h4>
+      <template v-if="row.space.diagnostics">
+        <p class="font-medium">Dienstdefinities — volledige tijdsenvelop vóór samenvoegen en weekafkapping</p>
+        <ul class="list-disc pl-5"><li v-for="(shift,i) in row.space.diagnostics.shifts" :key="i">{{shift.source==='previous'?'Vorige week':'Geselecteerde week'}}: vroegste start {{datetime(shift.earliestStart)}}, laatste start {{datetime(shift.latestStart)}}; {{shift.paidMinutes}} min betaald ({{shift.paidMode==='maximum'?'maximum':'exact'}}) + {{shift.unpaidMinutes}} min onbetaald = {{shift.totalMinutes}} min dienstduur; einde venster {{datetime(shift.end)}}.</li></ul>
+        <p class="font-medium">Samengevoegde vensters per kalenderdag — afgeknipt op de geselecteerde week</p>
+        <ul class="list-disc pl-5"><li v-for="day in row.space.diagnostics.days" :key="day.date">{{day.intervals.map(window=>`${datetime(window[0])} – ${datetime(window[1])}`).join('; ')}}: {{hours(day.windowHours)}} venster, {{hours(day.blockedHours)}} niet beschikbaar, {{hours(day.spaceHours)}} planbare ruimte.</li></ul>
+        <p v-if="!row.space.diagnostics.days.length">Geen inzetvensters in deze week.</p>
+      </template>
+      <p v-else>{{row.space.reason??'Geen betrouwbare venstergegevens beschikbaar.'}}</p>
+    </section>
+  </details>
 </template>

@@ -1,5 +1,8 @@
-import { intervalHours, intersectionHours, unionIntervals, workPlanHours, workPlanWindowsForDays, type Interval } from './capacity';
+import { amsterdamToUtc } from './time';
+import { intervalHours, intersectionHours, unionIntervals, workPlanHours, workPlanWindowsForDays, type Interval, type ShiftWindow } from './capacity';
+export interface DailyWindowSummary {date:string;intervals:Interval[];windowHours:number;blockedHours:number;spaceHours:number}
 export interface PlanningSpace {
+  diagnostics?:{shifts:ShiftWindow[];days:DailyWindowSummary[]};
   paid:{min:number;max:number}|null;
   windowHours:number|null;
   blockedHours:number|null;
@@ -34,6 +37,15 @@ export function calculatePlanningSpace(plan:unknown, week:string, unavailable:In
     result.windowHours=intervalHours(windows);
     result.blockedHours=intersectionHours(windows,blocked);
     result.spaceHours=Math.max(0,result.windowHours-result.blockedHours);
+    const days:DailyWindowSummary[]=[];
+    for(let offset=0;offset<7;offset++){
+      const day=new Date(week+'T12:00:00Z');day.setUTCDate(day.getUTCDate()+offset);const date=day.toISOString().slice(0,10);day.setUTCDate(day.getUTCDate()+1);
+      const start=amsterdamToUtc(date+'T00:00'),finish=amsterdamToUtc(day.toISOString().slice(0,10)+'T00:00');
+      const intervals=unionIntervals(windows.map(([a,b]):Interval=>[Math.max(a,start),Math.min(b,finish)]));
+      const windowHours=intervalHours(intervals),blockedHours=intersectionHours(intervals,blocked);
+      if(intervals.length)days.push({date,intervals,windowHours,blockedHours,spaceHours:Math.max(0,windowHours-blockedHours)});
+    }
+    result.diagnostics={shifts:[...incoming.details,...current.details],days};
     if(result.paid)result.reason=null;
   }catch(error){result.reason=error instanceof Error?error.message:'Inzetvensters konden niet worden bepaald.';}
   return result;

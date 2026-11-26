@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.2.1 — in ontwikkeling
+- Dienstduur expliciet afgesplitst: exacte/maximale betaalde dienstminuten plus alle expliciet onbetaalde activiteiten; betaalde activiteiten worden niet dubbel geteld.
+- Ontbrekende activiteiten werden eerder stilzwijgend als nul onbetaalde minuten behandeld. Dat geeft nu een gerichte melding; er wordt geen vaste pauzeduur of 50-uursuitkomst aangenomen.
+- Toegevoegd: controleerbare dienstduur- en vensteruitsplitsing per kalenderdag onder de bestaande tabeltoelichting, zonder extra API-calls. Tabel, marge en bestaande functies blijven behouden.
+- Regressietests en analyse in docs/SHIFT_DURATION.md; de exacte tenantoorzaak van 47,5 uur wacht nog op de werkelijke Work Plan-response.
 - Toegevoegd: alleen-lezen roosterhistorie met afzonderlijke aanmaak-, roosterbrede en agentgebonden wijzigingsdatum, vast weergegeven in Europe/Amsterdam.
 - Eerste publicatie en historie per Unavailable Time blijven expliciet ‘Niet beschikbaar’: deze ontbreken in de onderzochte bestaande endpointcontracten. Geen fallback naar aanmaakdatum, blokstart of huidige tijd.
 - Geteste neutrale vergelijkingslogica voor geverifieerde tijdstempels; zonder betrouwbare bronwaarden worden geen vergelijkingen getoond. Wijzigingen van andere medewerkers worden niet als agentwijziging gebruikt.

@@ -54,3 +54,6 @@ Een `constrainDayOff`-vlag is een aanvullende dag-af-regel voor een dienst, geen
 Tests dekken vaste/flexibele weekuren, nul/verschillende/ongeldige marges, grenswaarden en percentages boven 100%, overlappende en externe onbeschikbaarheid, nacht- en weekgrensvensters, verschillende plannen tussen weken, ongeldige data, directe herberekening zonder API-calls en behoud van OAuth/editor/roosterweergave. Gebruik `npm test`, `npm run typecheck`, `npm run build` en `npm run test:static`.
 
 **De planbaarheid is een indicator van de beschikbare tijdsruimte. Het is geen garantie dat Genesys Cloud daadwerkelijk een geldig rooster kan genereren. Hierbij spelen ook andere Work Plan-regels een rol, zoals maximale werkdagen, dienstlengtes en rusttijden.**
+
+## Controle van de totale dienstduur
+Betaalde activiteiten zitten al in de exacte/maximale betaalde dienstduur; alleen alle expliciet onbetaalde activiteitduren komen erbij. Een ontbrekende activiteitenlijst is geen bewijs voor nul onbetaalde tijd. De uitklapbare rekenuitsplitsing onder de bestaande toelichting toont de ontvangen duurcomponenten en samengevoegde dagvensters, zonder nieuwe API-aanroepen. Zie [SHIFT_DURATION.md](SHIFT_DURATION.md) voor de foutbron, validatie en de voorwaardelijke 50- versus 47,5-uursvoorbeelden.
