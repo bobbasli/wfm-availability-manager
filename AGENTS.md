@@ -6,7 +6,7 @@ Lees vóór elke wijziging `README.md`, `docs/ARCHITECTURE.md`, `docs/GENESYS_AP
 - Vue 3 Composition API met `<script setup>`, Vite, TypeScript met `strict: true`, Tailwind CSS.
 - Gebruik functionele, kleine, duidelijk benoemde functies. Scheid data-ophaling, businesslogica en UI.
 - Centraliseer **alle Genesys HTTP-verzoeken** via `src/services/genesysApi.ts`; plaats domeinspecifieke API-methoden in afzonderlijke services.
-- Nieuwe code in TypeScript; migreer de bestaande JS-composable incrementeel naar getypeerde composables en Vue-componenten. Vermijd grote risicovolle rewrites.
+- Alle applicatiecode is TypeScript; alle Vue-componenten gebruiken `<script setup lang="ts">`. `allowJs: false`. Houd de opgesplitste componenten/composables/services/helpers/types in stand.
 - Vermijd `any` in nieuwe code; valideer API-responses vanaf `unknown` voordat je ze gebruikt.
 - Hergebruik types, helpers en componenten; geen hardcoded tenant-, MU-, BU-, gebruikers- of client-ID's.
 - Region is configureerbaar; de demo gebruikt normaliter `mypurecloud.de` (prod-euc1). Geen client secret in de browser.
@@ -25,6 +25,9 @@ Lees vóór elke wijziging `README.md`, `docs/ARCHITECTURE.md`, `docs/GENESYS_AP
 - Toon uitsluitend vijf kolommen en vaste toelichting conform docs/CAPACITY_V021.md. Beoordeel vaste/flexibele weekuren met groen/oranje/rood en tekst per grens. Onbekende input of nul benodigde ruimte geeft —; ontbrekende weektoewijzingen worden nooit gegokt. Leg expliciet uit dat planningsruimte geen garantie op een geldig rooster is.
 - Resultaten en API-errors zichtbaar en navolgbaar; geen verzonnen resultaten of stilzwijgende defaults.
 
+- Vanaf v0.3.1: capaciteit standaard actief; medewerkerdoorklik via User-ID, gedeelde maandagweek en geen herophaling bij ongewijzigde terugkeer. Een succesvolle PATCH invalideert capaciteit; annulering niet.
+- Original en Latest Saved zijn afzonderlijke gegevenssets. Gebruik het officiële `agentId` + `schedule:{id,weekDate}`-contract; `consideredInScheduleGeneration=false` is Niet gebruikt, nooit automatisch Beschikbaar. Ongepubliceerde roosters zijn uitsluitend vergelijkingscontext, geen kalenderdiensten. Zie docs/AVAILABILITY_COMPARISON.md.
+
 ## Werkwijze
 1. Werk op feature branch; gebruik pull requests. `main` triggert GitHub Pages-productiedeployment.
 2. Beschrijf de wijziging, geraakte bestanden, tests en risico's in de PR.
@@ -33,5 +36,7 @@ Lees vóór elke wijziging `README.md`, `docs/ARCHITECTURE.md`, `docs/GENESYS_AP
 5. Geen gegevens van echte gebruikers, access tokens, ID's of API-dumps committen.
 6. Houd de afzonderlijke Genesys Queue Analytics-app buiten deze repository.
 
-## Bekende migratiestatus
-v0.2.0 is het **fundament**, niet de afgeronde rewrite. `src/composables/useAvailabilityManager.js` is legacy JavaScript en moet later in kleinere `.ts` composables worden omgezet. Houd bestaande kalender/editor-functies werkend tijdens de migratie. Voor live publicatie eerst PKCE-login, Unavailable Times-editor, rooster en capaciteit in Genesys testen.
+## Status v0.3.0
+De legacy JS-composable is vervangen door getypeerde composables. Zie `.github/copilot-instructions.md` voor de aangeleverde Vue-/TypeScript-/Tailwind-afspraken en `docs/ARCHITECTURE.md` voor de indeling. Draai ook `npm run format:check`. Gebruik geen typecheck-onderdrukking als migratieoplossing.
+
+De ontwikkel-PR gaat naar `feature/capacity-v021`; de afzonderlijke testrelease-PR gaat naar `main` van `wfm-availability-manager-test`. Nooit zelf mergen of publiceren. Behoud `backup/pre-v0.3.0`; instructies staan in `docs/DEPLOYMENT_V03.md`. Voor live gebruik blijven PKCE-login, editor, rooster en capaciteit in Genesys te testen.

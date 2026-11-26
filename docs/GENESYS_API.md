@@ -47,3 +47,11 @@ De centrale HTTP-module voert ook de OAuth-tokenuitwisseling uit. Alleen explici
 
 ## Historietijdstempels
 Roosters leveren `metadata.dateCreated` en `metadata.dateModified`; agentroosters leveren hun eigen `metadata.dateModified` in de via `user.id` geselecteerde rij. De bestaande roostermetadata heeft geen eerste publicatiedatum; `published` is alleen een boolean. `UnavailableTime` documenteert geen created/modified/actor-velden. Deze ontbrekende waarden krijgen geen fallback. Auditqueries vereisen `audits:audit:view`, maar worden niet automatisch aangeroepen zonder geverifieerde mapping en historievolledigheid. Zie [de volledige veldmatrix en officiële bronnen](HISTORY.md).
+
+## v0.3.0 — technische herstructurering
+De bestaande endpoints zijn ongewijzigd. `services/availability.ts` bevat nu de kalender-/rooster-/selectieaanroepen boven `genesysApi.ts`. Onbekende responses worden door helpers gevalideerd en omgezet naar getypeerde kalender-/editorstructuren. Er zijn geen auditcalls, nieuwe scopes of roostermutaties toegevoegd. De afzonderlijke Work Plan-service en de bestaande planningsruimteformule blijven behouden.
+
+## Original versus Latest Saved v0.3.1
+De aanvullende **POST /api/v2/workforcemanagement/businessunits/{businessUnitId}/unavailabletimes/schedules/query** gebruikt `{agentId, schedule:{id,weekDate}}`. `weekDate` is de startweek van het rooster (ook bij meerweekse roosters), niet noodzakelijk de geselecteerde kalenderweek. De response bevat `consideredInScheduleGeneration` en `scheduleGenerationUnavailableTimes[]` met `timeSpan` en `notes`. False betekent Niet gebruikt. Het endpoint vereist `wfm:unavailableTimes:view`. Er zijn geen blokhistorie- of publicatietijdstempels.
+
+Roosterdiscovery gebruikt nu de geselecteerde maandag in **GET .../weeks/{weekId}/schedules?includeOnlyPublished=false**, niet recent. Deze route bevat volgens het officiële contract roosters die de geselecteerde week overspannen. De kalender blijft expliciet gepubliceerde roosters eisen; een aparte Original-selector mag ongepubliceerde context gebruiken. [Exacte modellen, bronnen, verwerking en live beperkingen](AVAILABILITY_COMPARISON.md).

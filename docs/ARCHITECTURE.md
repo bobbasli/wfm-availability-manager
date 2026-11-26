@@ -1,53 +1,56 @@
-# Architectuur — v0.2.1
+# Architectuur — v0.3.1
 
-## Hosting / releaseproces
-Repository: https://github.com/bobbasli/wfm-availability-manager
-GitHub Pages (normale projectsite): https://bobbasli.github.io/wfm-availability-manager/
-Branch `main`: GitHub Actions bouwt Vite en publiceert `dist/`. Pull requests doen alleen een build. **Voorwaarde:** `Settings > Pages > Build and deployment > Source: GitHub Actions`.
-Vite base `./` ondersteunt het projectpad. De repository-URL op github.com is geen uitvoerbare app-URL. OAuth redirect-URI in Genesys moet exact de Pages-URL zijn (inclusief `/`), tenzij een custom domain wordt gebruikt.
+## Structuur
 
-## Componenten
-- `src/main.ts` initialiseert Vue.
-- `src/App.vue` is voorlopig het complete scherm (kalender, dialog, capaciteit). Nog opsplitsen.
-- `src/composables/useAvailabilityManager.js` bevat de bestaande UI- en domeinlogica; legacy, wordt incrementeel gemigreerd.
-- `src/services/genesysApi.ts` bevat de centrale authenticated HTTP-client en paginering.
-- `src/services/workforceManagement.ts` bevat de weekgebonden Work Plan-query; met strikt gevalideerde weeklookup en cache voor detailrequests.
-- `src/types/genesys.ts` definieert de eerste domeintypes.
-- `src/style.css`, Tailwind- en PostCSS-configuratie verzorgen styling.
+```text
+src/
+  App.vue                         samenstellen en tabnavigatie
+  views/CalendarView.vue          kalenderpagina en roosterkeuze
+  views/CapacityView.vue          week/marge en capaciteitspresentatie
+  components/                    header, selectie, tijdlijn, editor, historie, tabel
+  composables/
+    useAvailabilityManager.ts    selectie, laden en selectieversies
+    useGenesysSession.ts         PKCE, sessiebinding, aanmelden/afmelden
+    usePublishedSchedules.ts     roosterkeuze, metadata en agentrooster
+    useUnavailableEditor.ts      draft, validatie, bevestigde wijziging
+    useCapacity.ts               weektoewijzingen en capaciteitsdata
+    useDialogFocus.ts            dialoogfocus, tabbegrenzing, focusherstel
+    useTheme.ts                  lokale voorkeur licht/donker
+  helpers/                       pure kalender-/response-/roosterparsers
+  domain/                        pure berekeningen, tijdzones en historie
+  services/                      centrale client, OAuth, regio's, WFM services
+  types/                         gedeelde interfaces en selectie-/editorcontracten
+```
 
-## Dataflow
-OAuth PKCE -> token in sessionStorage -> Genesys API-client -> BU/MU/agent -> Unavailable Times en gepubliceerd rooster -> Vue presentatie.
-Capaciteit: geselecteerde MU + huidige/vorige week → weekgebonden user.id-lookup → gedeelde Work Plan-detailcache → union van inzetvensters en overlappende Unavailable Times → planbare ruimte. Vue computed vergelijkt die ruwe ruimte met beide grenzen van betaalde uren inclusief de huidige marge. Margewijzigingen halen geen API-data opnieuw op. Geen roostercombinaties, maximumcapaciteit of gegenereerd rooster.
+Alle Vue-componenten gebruiken Composition API met `<script setup lang="ts">`. `strict: true`, `allowJs: false`; er is geen JavaScript-applicatiecode of typecheck-onderdrukking. `unknown` vormt de externe datagrens. Helpers controleren responsevormen voordat gegevens in getypeerde presentatie- en editorstructuren terechtkomen. Pure businesslogica blijft bewust in `domain/` in plaats van in UI-componenten.
 
-## Security
-Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De huidige implementatie bewaart het token voor de tab in `sessionStorage`; nooit tokens of client secrets loggen/commiten. OAuth `state` en PKCE verifier. Beperk OAuth scopes tot werkelijk noodzakelijke machtigingen en controleer per endpoint. De API-client bevat diagnose-informatie: deel die niet publiek zonder redactie.
+## Eigenaarschap en dataflow
 
-## TODO voor Codex
-1. Valideer de geïmplementeerde weeklookup met live Genesys-gegevens, inclusief rotaties, overrides en historische planversies. Synthetische fixtures dekken meerdere medewerkers/weken en ongeldige mappings.
-2. Split editor, weektijdlijn, roosterselectie en capaciteitstabel naar SFCs, composables en services.
-3. Migreer legacy JS naar strikte TS (schakel `allowJs` en `checkJs` uiteindelijk uit/aan conform einddoel).
-4. Unit-tests voor tijdzone DST (zomer-/wintertijd), nachtshift, overlap, flexuren, planwijziging en ambiguïteit.
-5. Controleer API-paginering, 401/token expiry, ongeautoriseerde states en race conditions bij wisselen van MU.
-6. Lockfile en `npm ci` zijn toegevoegd; onderhoud dependencies via gecontroleerde lockfile-updates.
+`useAvailabilityManager` coördineert de selectie en geeft bestaande refs door aan de views. Views en componenten voeren geen HTTP-verzoeken uit. `useGenesysSession` bewaart de koppeling regio/client/token. `services/availability.ts` bundelt de bestaande kalender-, medewerker- en roosterendpoints; alle verzoeken lopen via `services/genesysApi.ts`. Work Plan-query's en detailcache blijven in `workforceManagement.ts`.
 
-## Geteste herstelgrenzen
-- `src/domain/time.ts`: Amsterdamse kloktijdconversie, lokale daggrenzen en exacte publicatiestatus.
-- `src/domain/capacity.ts`: gevalideerde betaalde uren, DST-veilige inzetvensters, intervalvereniging en overlap.
-- `src/services/regions.ts` / `oauth.ts`: exacte regiodomeinen en PKCE-verzoekopbouw.
-- `src/composables/useDialogFocus.ts`: focusplaatsing, focusbegrenzing en terugkeer naar de trigger.
-- De legacy JS-composable blijft incrementeel te migreren; `strict: true` betekent niet dat deze JS volledig wordt gecontroleerd.
-- Verzoeken hebben selectie-/sessiecontroles vóór resultaten worden toegepast. Een gewijzigde medewerker of datum sluit de editor; gewijzigde week of medewerkerlijst wist capaciteit.
-- `npm test` test synthetische scenario’s voor tijdzones, API-fouten, PKCE, selectieconflicten en bevestigde editormutaties. Dit vervangt geen live Genesys-acceptatie.
+Bij een selectie-/sessiewissel wordt de selectieversie verhoogd, de editor gesloten, oude roosterkeuze/-metadata gewist en lopende resultaten ongeldig gemaakt. Iedere loader controleert de actuele selectie en eigen verzoekversie. Een oud resultaat mag de nieuwe selectie niet overschrijven. Oude foutmeldingen na een editorwissel worden eveneens genegeerd. Een 401 wist de sessie en vraagt opnieuw aanmelden. Mutaties worden nooit automatisch herhaald.
 
-Work Plan-dataflow: `user.id` → kalenderweekindex vanaf `referenceStartWeekDate` → numerieke sleutel in `workPlanLookupKeysPerWeek` → `workPlanLookup` → expliciet plan-ID → gevalideerde detailresponse via de centrale client. De MU-/refreshgebonden detailcache deelt promises; ontbrekende of ongeldige mappings krijgen per rij een melding zonder percentage.
+De editor accepteert uitsluitend gevalideerde tijdvakken. Hij verstuurt uitsluitend `id`, `timeSpan`, `notes` en `delete` waar van toepassing, na een expliciete bevestiging. Informative geschiedenisvelden worden niet teruggeschreven. Gepubliceerde roosters gebruiken uitsluitend lees-/query-endpoints.
 
-## v0.2.1
-- `src/domain/planningSpace.ts`: pure ruimteberekening en marge-/kleurbeoordeling; geen begrenzing op 100%.
-- `src/domain/capacity.ts`: hergebruikte tijdsenveloppen, weekuren, vereniging en overlap. Startdagen uit vorige en huidige Work Plans worden gescheiden verwerkt.
-- `src/composables/useCapacity.ts`: API-data, gedeelde detailcache, lokale margeopslag en selectie-/sessiecontroles.
-- `src/components/CapacityTable.vue`: vijf kolommen, reactieve percentages/kleuren per grens en permanente toelichting.
-- De experimentele dienstcombinatie-solver en voorbeeldindelingen zijn verwijderd uit de app; andere functionaliteit blijft behouden.
-- Zie [CAPACITY_V021.md](CAPACITY_V021.md) voor de huidige methode en beperkingen.
+## Berekeningen behouden
 
-## Rooster- en beschikbaarheidshistorie
-`src/domain/history.ts` valideert alleen gedocumenteerde metadata en formatteert instants als dd-MM-yyyy HH:mm in Europe/Amsterdam. `ScheduleHistory.vue` toont aanmaak, eerste publicatie (onbekend), roosterbrede wijziging en de eigen agentwijziging afzonderlijk. `AvailabilityHistory.vue` is alleen-lezen in het bestaande bewerkvenster. De bestaande Unavailable Time-response bevat geen betrouwbare blokhistorie; ontbrekende waarden blijven null. Er zijn geen extra API-calls. Zie [HISTORY.md](HISTORY.md) voor de veldmatrix, rechten, auditonderzoek en vergelijkingsbeperkingen.
+De capaciteit gebruikt het weeklookupcontract en de vorige week voor inkomende nachtvensters, zonder fallback naar een eerste/default Work Plan. Union van inzetvensters minus de overlappende union van Unavailable Times geeft tijdsruimte. De marge wordt lokaal via computed opnieuw toegepast; percentages boven 100% blijven geldig. Geen roosterplanner, gewijzigde formule of adoptie van PR #5. De bevestigde 47,5 uur/95%-uitkomst is correct voor het besproken Work Plan.
+
+## Styling en toegankelijkheid
+
+Tailwind 3 blijft behouden. De centrale `@layer components` in `style.css` bevat onder andere `panel`, `card`, `input`, `btn-primary`, `text-soft` en de tabstatussen. De Tailwind 4-syntaxis uit het aangeleverde voorbeeld is vertaald naar de bestaande Tailwind 3-configuratie; geen onnodige frameworkupgrade. Dynamische kalenderposities en werkelijke API-activiteitskleuren blijven inline omdat ze gegevensafhankelijk zijn.
+
+Het thema volgt aanvankelijk de systeemvoorkeur en bewaart een expliciete keuze lokaal. Heroicons levert zon/maan; pictogramknoppen hebben Nederlandstalige toegankelijke namen. De bestaande geteste dialoogfocus blijft behouden: eerste focus, Tab/Shift+Tab begrenzen, Escape sluiten, focus terug naar de trigger. Native selecties en buttons blijven behouden; Headless UI is niet toegevoegd voor functionaliteit die al klein en getest is. VueUse is niet nodig.
+
+Prettier is uitsluitend ontwikkelgereedschap; `npm run format` en `format:check` bewaken leesbaarheid. De architectuurcontrole controleert getypeerde SFCs, strikte configuratie en de HTTP-servicelaag.
+
+## Hosting, herstel en grenzen
+
+Vite base `./` ondersteunt beide repositorypaden. CI bouwt en test PR's; alleen push naar `main` kan Pages publiceren. De oorspronkelijke bronrepository-main blijft onaangeraakt. De testrepository heeft een afzonderlijke release-PR. Zie [DEPLOYMENT_V03.md](DEPLOYMENT_V03.md).
+
+Live Genesys-login, rechten, daadwerkelijke weekrotaties/overrides en historische planversies blijven acceptatiepunten. Audit Logs zijn niet toegevoegd. Eerste roosterpublicatie en Unavailable Time-historie zijn volgens de huidige endpointcontracten niet beschikbaar; zie HISTORY.md. Een groene test/build vervangt deze live controle niet.
+
+## Navigatie en Original/Latest Saved v0.3.1
+`useWeekSelection` is de gedeelde maandagweek voor capaciteit en kalender. `WeekNavigation` verzorgt datumselectie en vorige/volgende week. Een medewerkersknop in CapacityTable geeft een User-ID aan de coordinator, die de kalender opent en onafhankelijke loaders gebundeld start. Lopende identieke aanvragen worden gedeeld; de bestaande selectieversies blijven leidend.
+
+`usePublishedSchedules` vraagt de geselecteerde week op en houdt gepubliceerde kalenderkeuze gescheiden van Original-vergelijkingscontext (ook ongepubliceerd). `availability.ts` bevat de officiële Original-query. De pure helper `availabilityComparison.ts` valideert, verenigt en vergelijkt intervallen per Amsterdamse dag. `UnavailableComparison` presenteert beide datasets en de verschillen. Succesvolle editormutaties melden invalidatie aan de capacity-coordinator, die alleen bij terugkeer ververst. Zie AVAILABILITY_COMPARISON.md voor contracten en beperkingen.
