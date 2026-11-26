@@ -13,7 +13,7 @@ describe('roosterpublicatie',()=>{
   it('vereist een expliciete publicatie',()=>{expect(isPublished({published:true})).toBe(true);expect(isPublished({status:'Published'})).toBe(true);expect(isPublished({published:false,status:'Published'})).toBe(false);expect(isPublished({})).toBe(false);});
 });
 describe('capaciteit',()=>{
-  const shift={days:{values:['Sunday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:480};
+  const shift={days:{values:['Sunday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:480,activities:[]};
   it.each([['2026-03-23','2026-03-30','2026-03-29T07:00:00.000Z'],['2026-10-19','2026-10-26','2026-10-25T08:00:00.000Z']])('houdt 09:00 lokaal vast in week %s',(week,next,start)=>{
     const result=workPlanWindows({shifts:[shift]},week,next);expect(new Date(result.intervals[0][0]).toISOString()).toBe(start);expect(result.intervals[0][1]-result.intervals[0][0]).toBe(8*3600000);
   });

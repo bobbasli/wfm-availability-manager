@@ -2,7 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {calculatePlanningSpace,assessPlanningSpace,unknownSpace,type PlanningSpace} from '../src/domain/planningSpace';
 import {amsterdamToUtc} from '../src/domain/time';
 const week='2026-11-09';
-const plan=(paid=24)=>({weeklyExactPaidMinutes:paid*60,shifts:[{days:{values:['Monday','Tuesday','Wednesday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:480}]});
+const plan=(paid=24)=>({weeklyExactPaidMinutes:paid*60,shifts:[{days:{values:['Monday','Tuesday','Wednesday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:480,activities:[]}]});
 const span=(start:string,end:string):[number,number]=>[amsterdamToUtc(start),amsterdamToUtc(end)];
 const data=(hours:number,paid=24):PlanningSpace=>({paid:{min:paid,max:paid},windowHours:hours,blockedHours:0,spaceHours:hours,reason:null});
 describe('ruimtemarge en kleuren',()=>{
@@ -43,7 +43,7 @@ describe('vensters en onbeschikbaarheid',()=>{
     const result=calculatePlanningSpace(plan(),week,[span(week+'T00:00',week+'T08:00'),span('2026-11-12T12:00','2026-11-12T18:00')],plan());expect(result.blockedHours).toBe(0);expect(result.spaceHours).toBe(24);
   });
   it('bepaalt een flexibele envelop in plaats van dienstcombinaties',()=>{
-    const value={...plan(),maximumDays:1,shifts:[{days:{values:['Monday','Tuesday','Wednesday','Thursday','Friday']},flexibleStartTime:true,earliestStartTimeMinutesFromMidnight:480,latestStartTimeMinutesFromMidnight:600,exactPaidTimeMinutes:480}]};
+    const value={...plan(),maximumDays:1,shifts:[{days:{values:['Monday','Tuesday','Wednesday','Thursday','Friday']},flexibleStartTime:true,earliestStartTimeMinutesFromMidnight:480,latestStartTimeMinutesFromMidnight:600,exactPaidTimeMinutes:480,activities:[]}]};
     const result=calculatePlanningSpace(value,week,[],value);expect(result.spaceHours).toBe(50);expect(assessPlanningSpace(result,25).minimum?.percentage).toBeCloseTo(166.6667);
   });
   it('houdt rekening met onbetaalde activiteitduur in de envelop',()=>{
@@ -63,7 +63,7 @@ describe('vensters en onbeschikbaarheid',()=>{
     const value={...plan(),shifts:[{...plan().shifts[0],days:{values:['Sunday']},exactStartTimeMinutesFromMidnight:540}]};
     expect(calculatePlanningSpace(value,String(selected),[],value).spaceHours).toBe(hours);
   });
-  it.each([null,{}, {shifts:[]}, {weeklyExactPaidMinutes:1440,shifts:[{days:{values:['Monday']},exactStartTimeMinutesFromMidnight:null,exactPaidTimeMinutes:480}]}])('toont onbekend bij ongeldige venstergegevens',value=>{
+  it.each([null,{}, {shifts:[]}, {weeklyExactPaidMinutes:1440,shifts:[{days:{values:['Monday']},exactStartTimeMinutesFromMidnight:null,exactPaidTimeMinutes:480,activities:[]}]}])('toont onbekend bij ongeldige venstergegevens',value=>{
     const result=calculatePlanningSpace(value,week,[],plan());expect(result.spaceHours).toBeNull();expect(result.reason).toBeTruthy();
   });
   it('verzint geen inkomende vensters bij ontbrekende vorige toewijzing',()=>{

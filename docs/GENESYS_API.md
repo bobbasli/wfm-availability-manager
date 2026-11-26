@@ -47,3 +47,6 @@ De centrale HTTP-module voert ook de OAuth-tokenuitwisseling uit. Alleen explici
 
 ## Historietijdstempels
 Roosters leveren `metadata.dateCreated` en `metadata.dateModified`; agentroosters leveren hun eigen `metadata.dateModified` in de via `user.id` geselecteerde rij. De bestaande roostermetadata heeft geen eerste publicatiedatum; `published` is alleen een boolean. `UnavailableTime` documenteert geen created/modified/actor-velden. Deze ontbrekende waarden krijgen geen fallback. Auditqueries vereisen `audits:audit:view`, maar worden niet automatisch aangeroepen zonder geverifieerde mapping en historievolledigheid. Zie [de volledige veldmatrix en officiële bronnen](HISTORY.md).
+
+## Dienstduur en activiteitgegevens
+`exactPaidTimeMinutes` omvat alle betaalde activiteiten van een vaste dienst. Bij `flexiblePaidTime=true` geven `minimumPaidTimeMinutes`/`maximumPaidTimeMinutes` de betaalde duurgrenzen; de buitenenvelop gebruikt maximum. Som alleen activiteiten met `countsAsPaidTime=false` en een geldige `lengthMinutes` bij die betaalde duur op. Ontbrekende activiteiten of ambigue modevlaggen krijgen geen nul/default. Zie [SHIFT_DURATION.md](SHIFT_DURATION.md) voor bronverwijzingen, validatie en tenantdiagnose.

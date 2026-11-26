@@ -98,7 +98,7 @@ it('berekent capaciteit met eigen weekplannen en haalt gedeelde details één ke
       {user:{id:'employee-c'},workPlanLookupKeysPerWeek:[null,null]},
       {user:{id:'employee-d'},workPlanLookupKeysPerWeek:[1,0]},
     ],workPlanLookup:{'0':{id:'plan-a'},'1':{id:'plan-b'}}}});
-    if(input.includes('/workplans/')){const id=input.split('/').at(-1),minutes=id==='plan-a'?480:240;return json({id,name:id,weeklyExactPaidMinutes:minutes,maximumDays:1,optionalDays:{values:['Monday']},shifts:[{days:{values:['Monday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:minutes}]});}
+    if(input.includes('/workplans/')){const id=input.split('/').at(-1),minutes=id==='plan-a'?480:240;return json({id,name:id,weeklyExactPaidMinutes:minutes,maximumDays:1,optionalDays:{values:['Monday']},shifts:[{days:{values:['Monday']},exactStartTimeMinutesFromMidnight:540,exactPaidTimeMinutes:minutes,activities:[]}]});}
     return json({entities:[]});
   });vi.stubGlobal('fetch',fetch);
   manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.capacityWeek.value='2026-11-09';
