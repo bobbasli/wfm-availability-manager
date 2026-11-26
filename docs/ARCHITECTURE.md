@@ -17,7 +17,7 @@ Vite base `./` ondersteunt het projectpad. De repository-URL op github.com is ge
 
 ## Dataflow
 OAuth PKCE -> token in sessionStorage -> Genesys API-client -> BU/MU/agent -> Unavailable Times en gepubliceerd rooster -> Vue presentatie.
-Capaciteit: geselecteerde MU + week -> huidige en vorige weektoewijzing per user.id -> gedeelde Work Plan-detailcache -> Unavailable Times -> gevalideerde volledige kandidaatdiensten -> exacte combinaties binnen dag-/weekgrenzen -> maximaal betaalde uren en minimumdekking (maximaal 100%). Flexibiliteit wordt afzonderlijk bepaald. Fout/onbekend -> expliciete waarschuwing en geen percentage.
+Capaciteit: geselecteerde MU + huidige/vorige week → weekgebonden user.id-lookup → gedeelde Work Plan-detailcache → union van inzetvensters en overlappende Unavailable Times → planbare ruimte. Vue computed vergelijkt die ruwe ruimte met beide grenzen van betaalde uren inclusief de huidige marge. Margewijzigingen halen geen API-data opnieuw op. Geen roostercombinaties, maximumcapaciteit of gegenereerd rooster.
 
 ## Security
 Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De huidige implementatie bewaart het token voor de tab in `sessionStorage`; nooit tokens of client secrets loggen/commiten. OAuth `state` en PKCE verifier. Beperk OAuth scopes tot werkelijk noodzakelijke machtigingen en controleer per endpoint. De API-client bevat diagnose-informatie: deel die niet publiek zonder redactie.
@@ -42,8 +42,9 @@ Geen eigen backend. Browser-token wordt alleen gebruikt richting Genesys. De hui
 Work Plan-dataflow: `user.id` → kalenderweekindex vanaf `referenceStartWeekDate` → numerieke sleutel in `workPlanLookupKeysPerWeek` → `workPlanLookup` → expliciet plan-ID → gevalideerde detailresponse via de centrale client. De MU-/refreshgebonden detailcache deelt promises; ontbrekende of ongeldige mappings krijgen per rij een melding zonder percentage.
 
 ## v0.2.1
-- `src/domain/plannability.ts`: pure TypeScript-solver met expliciete regelvalidatie, begrensde enumeratie/dynamische toestanden, betaalde uren, onbekendheidsredenen en aparte flexibiliteitsindicator.
-- `src/composables/useCapacity.ts`: strikt getypeerde data-ophaling, huidige/vorige weekcontext, detailcache en bescherming tegen verouderde selecties. API-verzoeken blijven via `genesysApi.ts` lopen.
-- `src/components/CapacityTable.vue`: nieuwe tienkolomstabel en toegankelijk detailvenster met focusbeheer, Escape en focusherstel.
-- De overige legacy UI-logica wordt niet herschreven. `capacity.ts` levert hergebruikte interval-/urenhelpers; zijn oude vensterenvelop is geen planningsbewijs en voedt de nieuwe planbaarheid niet.
-- Zie [CAPACITY_V021.md](CAPACITY_V021.md) voor ondersteunde regels, rekengrenzen, voorbeelden en resterende beperkingen.
+- `src/domain/planningSpace.ts`: pure ruimteberekening en marge-/kleurbeoordeling; geen begrenzing op 100%.
+- `src/domain/capacity.ts`: hergebruikte tijdsenveloppen, weekuren, vereniging en overlap. Startdagen uit vorige en huidige Work Plans worden gescheiden verwerkt.
+- `src/composables/useCapacity.ts`: API-data, gedeelde detailcache, lokale margeopslag en selectie-/sessiecontroles.
+- `src/components/CapacityTable.vue`: vijf kolommen, reactieve percentages/kleuren per grens en permanente toelichting.
+- De experimentele dienstcombinatie-solver en voorbeeldindelingen zijn verwijderd uit de app; andere functionaliteit blijft behouden.
+- Zie [CAPACITY_V021.md](CAPACITY_V021.md) voor de huidige methode en beperkingen.

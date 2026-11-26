@@ -2,7 +2,7 @@
 import CapacityTable from './components/CapacityTable.vue';
 import { useDialogFocus } from './composables/useDialogFocus';
 import { useAvailabilityManager } from './composables/useAvailabilityManager';
-const { activeTab,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch } = useAvailabilityManager();
+const { activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch } = useAvailabilityManager();
 const { dialog: editorDialog, trapDialogFocus } = useDialogFocus(draft);
 </script>
 <template>
@@ -41,12 +41,12 @@ const { dialog: editorDialog, trapDialogFocus } = useDialogFocus(draft);
 </section>
 <section v-show="activeTab==='capacity'" class="bg-white rounded-xl shadow-sm p-5 space-y-4">
   <div class="flex flex-wrap justify-between items-center gap-3"><div><h2 class="text-lg font-semibold">Capaciteit &amp; beschikbaarheid</h2><p class="text-sm text-slate-500">Alle medewerkers in de geselecteerde Management Unit · weekcijfers · alleen lezen</p></div><button @click="loadCapacity" :disabled="capacityBusy || !managementUnit || !agents.length" class="bg-[#263b73] text-white rounded-lg px-4 py-2 text-sm">{{capacityBusy?'Bezig…':'Overzicht ophalen / verversen'}}</button></div>
+  <label class="block text-sm font-medium max-w-xs">Planningsmarge (%)<input type="number" min="0" max="100" step="any" v-model.number="capacityMargin" class="mt-1 w-full border rounded-lg p-2"></label>
   <label class="block text-sm font-medium max-w-xs">Week vanaf (maandag)<input type="date" v-model="capacityWeek" class="mt-1 w-full border rounded-lg p-2"></label>
   <p class="text-sm text-slate-600">{{capacityProgress || 'Selecteer een Management Unit en haal het overzicht op.'}}</p>
   <p v-for="warning in capacityDiagnostics" :key="warning" class="text-sm text-amber-800" role="status">{{warning}}</p>
   <p v-if="capacityError" class="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm" role="alert">{{capacityError}}</p>
-  <CapacityTable :rows="capacityRows" />
-  <p class="text-xs text-slate-600">Planbaarheid = maximaal planbare betaalde uren / vereiste contracturen, begrensd op 100%. Bij flexibele weekuren geldt het minimum als eis en het maximum als bovengrens. Vrije inzetvensters zijn geen extra contractcapaciteit. Er is geen opslag van 25%. Flexibiliteit is een aparte kwalitatieve indicatie; uitleg staat bij de medewerkerdetails. Onvoldoende beschreven regels of een berekeningslimiet geven ‘Niet vast te stellen’.</p>
+  <CapacityTable :rows="capacityRows" :margin="capacityMargin" />
 </section>
 <div v-if="draft" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4" @click.self="closeEditor">
 <div ref="editorDialog" tabindex="-1" @keydown.esc.prevent="closeEditor" @keydown.tab="trapDialogFocus" role="dialog" aria-modal="true" aria-label="Unavailable Time bewerken" class="bg-white w-full max-w-lg rounded-xl shadow-xl p-6 space-y-4">

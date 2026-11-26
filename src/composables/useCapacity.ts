@@ -1,10 +1,11 @@
 import { ref, watch, type Ref } from 'vue';
 import type { RequestFunction } from '../services/genesysApi';
 import { createWorkPlanDetailsLoader, queryAgentWorkPlans } from '../services/workforceManagement';
-import { calculatePlannability, unknownPlanning, type Interval, type PlanningResult } from '../domain/plannability';
+import { calculatePlanningSpace, unknownSpace, validMargin, type PlanningSpace } from '../domain/planningSpace';
+import { workPlanHours, type Interval } from '../domain/capacity';
 import { localParts } from '../domain/time';
 
-export interface CapacityRow { id:string; name:string; planName:string; calculation:PlanningResult }
+export interface CapacityRow { id:string; name:string; planName:string; space:PlanningSpace }
 interface CapacityConfig { businessUnit:Ref<string>; managementUnit:Ref<string>; token:Ref<string>; agents:Ref<unknown>; request:RequestFunction }
 const object=(value:unknown):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value);
 function monday(date:string):string {
@@ -26,6 +27,10 @@ export function unavailablePeriods(response:unknown):Interval[] {
   });
 }
 export function useCapacity(config:CapacityConfig) {
+  const stored=localStorage.getItem('wfm_capacity_margin');
+  const parsed=stored===null?25:Number(stored);
+  const capacityMargin=ref<number|string>(stored!==''&&validMargin(parsed)?parsed:25);
+  watch(capacityMargin,value=>{if(validMargin(value))localStorage.setItem('wfm_capacity_margin',String(value));},{flush:'sync'});
   const capacityWeek=ref(monday(localParts(Date.now()).date));
   const capacityBusy=ref(false),capacityProgress=ref(''),capacityError=ref('');
   const capacityRows=ref<CapacityRow[]>([]),capacityDiagnostics=ref<string[]>([]);
@@ -72,7 +77,7 @@ export function useCapacity(config:CapacityConfig) {
       async function worker() {
         while(index<roster.length) {
           const i=index++,agent=roster[i];if(!current())return;
-          const row:CapacityRow={...agent,planName:'Niet vastgesteld',calculation:unknownPlanning(week,warnings.get(agent.id)??'Work Plan-toewijzing ontbreekt.')};
+          const row:CapacityRow={...agent,planName:'Niet vastgesteld',space:unknownSpace(warnings.get(agent.id)??'Work Plan-toewijzing ontbreekt.')};
           const id=assignments.get(agent.id);
           if(id) {
             try {
@@ -89,10 +94,9 @@ export function useCapacity(config:CapacityConfig) {
               let boundaryError=previousError;
               if(previousId){try{previousPlan=await details(previousId);}catch(error){boundaryError=error instanceof Error?error.message:previousError;}}
               if(!current())return;
-              row.calculation=calculatePlannability(plan,week,periods,previousPlan?{previousPlan}:undefined);
-              if(!previousPlan)row.calculation.reasons.push(boundaryError);
+              row.space=previousPlan?calculatePlanningSpace(plan,week,periods,previousPlan):{...unknownSpace(boundaryError),paid:workPlanHours(plan)};
             } catch(error) {
-              row.calculation=unknownPlanning(week,error instanceof Error?error.message:'Work Plan of onbeschikbaarheid kon niet worden opgehaald.');
+              row.space=unknownSpace(error instanceof Error?error.message:'Work Plan of onbeschikbaarheid kon niet worden opgehaald.');
             }
           }
           if(!current())return;
@@ -106,5 +110,5 @@ export function useCapacity(config:CapacityConfig) {
     }catch(error){if(operation===version)capacityError.value=error instanceof Error?error.message:'Capaciteit kon niet worden berekend.';}
     finally{capacityBusy.value=false;}
   }
-  return {capacityWeek,capacityBusy,capacityProgress,capacityError,capacityRows,capacityDiagnostics,loadCapacity};
+  return {capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityError,capacityRows,capacityDiagnostics,loadCapacity};
 }

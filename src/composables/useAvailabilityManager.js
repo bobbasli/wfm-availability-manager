@@ -32,7 +32,7 @@ export function useAvailabilityManager(){
     const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
     // Separate weekly MU capacity view. Read-only, never changes agent availability.
     const activeTab=ref('calendar');
-    const {capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity}=useCapacity({businessUnit,managementUnit,token,agents,request:(...args)=>api(...args)});
+    const {capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity}=useCapacity({businessUnit,managementUnit,token,agents,request:(...args)=>api(...args)});
     watch([businessUnit,managementUnit,agentId,start,end,region,token],()=>{selectionVersion++;closeEditor();lastResponse.value=null;scheduleData.value=null;busy.value=false;scheduleBusy.value=false;}, {flush:'sync'});
     const hoursText=n=>Number.isFinite(n)?(Math.round(n*100)/100).toLocaleString('nl-NL',{maximumFractionDigits:2})+' u':'—';
     const pctText=n=>Number.isFinite(n)?(Math.round(n*10)/10).toLocaleString('nl-NL',{maximumFractionDigits:1})+'%':'—';
@@ -335,5 +335,5 @@ export function useAvailabilityManager(){
     watch([clientId,region],()=>{logout();saveConfig();},{flush:'sync'});
     watch([start,end],()=>{if(agentId.value){loadUnavailable();discoverSchedules();}});
     onMounted(async()=>{try{validateRegion(region.value);await callback();await initialize();}catch(e){sessionStorage.removeItem('wfm_pkce');sessionStorage.removeItem('wfm_state');sessionStorage.removeItem('wfm_oauth_context');setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {activeTab,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
 }

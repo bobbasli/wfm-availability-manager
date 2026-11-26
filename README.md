@@ -1,6 +1,6 @@
 # WFM Availability Manager — v0.2.1
 
-Vue 3 Composition API + TypeScript-services + Vite + Tailwind CSS. Browsergebaseerde Genesys Cloud Supervisor Client App: Unavailable Times-editor, gepubliceerd rooster en gescheiden planbaarheid en inzetflexibiliteit. **Nog in migratie/test; niet direct productiegeschikt verklaren.**
+Vue 3 Composition API + TypeScript-services + Vite + Tailwind CSS. Browsergebaseerde Genesys Cloud Supervisor Client App: Unavailable Times-editor, gepubliceerd rooster en inzicht in beschikbare planningsruimte. **Nog in migratie/test; niet direct productiegeschikt verklaren.**
 
 ## Jouw GitHub repository
 - Broncode: https://github.com/bobbasli/wfm-availability-manager
@@ -36,12 +36,14 @@ Lokaal: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`. Gebruik Node
 
 ## Capaciteit & beschikbaarheid v0.2.1
 
-De tab vergelijkt geen vrije vensteruren meer met contracturen plus 25%. Een exacte, begrensde TypeScript-berekening zoekt combinaties van volledige geldige diensten binnen de ondersteunde Work Plan-regels, maximale werkdagen en Unavailable Times. Planbaarheid wordt op 100% begrensd; flexibele weekuren tonen het vereiste minimum en toegestane maximum afzonderlijk.
+De tab toont vijf kolommen: **Medewerker / Work Plan**, **Betaald / week**, **Niet beschikbaar**, **Planbare ruimte** en **Planbaarheid**. Zij geeft aan hoeveel tijdsruimte Genesys WFM heeft om diensten te plaatsen; zij berekent geen maximaal werkbare uren en genereert geen rooster.
 
-Voorbeeld: 24 contracturen en 65 mogelijke vensteruren geven maximaal 24 betaalde uren en 100% dekking, niet 216,7% capaciteit. Een blokkade van één uur midden in een vaste dienst van acht uur verwijdert die dienst volledig, in plaats van zeven uur over te houden.
+Planbare ruimte = samengevoegde inzetvensteruren − overlappende Unavailable Times. Benodigde ruimte = betaalde weekuren × (1 + marge / 100). Planbaarheid = planbare ruimte / benodigde ruimte × 100. De marge is standaard 25% en werkt onmiddellijk, zonder nieuwe API-ophaling. Percentages boven 100% geven extra planningsruimte aan.
 
-Flexibiliteit is een afzonderlijke, uitlegbare kwalitatieve indicatie op basis van mogelijke werkdagen, starttijden en geldige contractindelingen. Klik op een medewerker voor regels, vensters, onbeschikbaarheid, kandidaatdiensten en een eventuele voorbeeldindeling. Een voorbeeld is geen gepubliceerd Genesys-rooster en wordt nooit opgeslagen.
+Bij 24 betaalde uren, 25% marge en 30 uur ruimte is de indicator 100%. Bij 50 uur ruimte is deze 166,7%, zonder te suggereren dat de medewerker 50 betaalde uren mag werken. Groen betekent voldoende ruimte inclusief marge, oranje voldoende voor de betaalde uren maar niet de marge, rood onvoldoende voor de betaalde uren. Teksten en tooltips leggen dit uit.
 
-Bij onbekende of ontbrekende regels, ontbrekende vorige-week-context, weekgrensproblemen of een zoeklimiet staat er **Niet vast te stellen**, zonder percentage of bewezen uurmaximum. Onder meer flexibele pauzeplaatsing, periode-/weekendregels en aanvullende rustregels zijn nog niet volledig ondersteund. Zie [de berekeningsmethode, voorbeelden en beperkingen](docs/CAPACITY_V021.md).
+Flexibele weekuren tonen beide grenzen met afzonderlijke percentages en kleuren; het maximum is geen automatische verplichting. Bij onbekende data of nul benodigde ruimte staat er — met toelichting. Huidige en vorige weektoewijzingen bepalen de juiste vensters bij nachtdiensten en weekwisselingen, zonder standaardplan.
 
-De bestaande OAuth PKCE, BU/MU/medewerkerselectie, Unavailable Times-editor en alleen-lezen gepubliceerde roosters blijven behouden. Automatische tests gebruiken alleen synthetische gegevens; live acceptatie blijft nodig. Deze wijziging wordt uitsluitend op een ontwikkelbranch aangeboden en wordt niet automatisch naar productie uitgerold.
+De vaste uitleg **Toelichting bij de cijfers** staat direct onder de tabel. De indicator is geen garantie op een geldig rooster: maximale werkdagen, dienstlengtes, rust en andere Work Plan-regels spelen ook een rol. Zie [de methode en beperkingen](docs/CAPACITY_V021.md).
+
+OAuth PKCE, BU/MU/medewerkerselectie, de Unavailable Times-editor en gepubliceerde roosters blijven behouden. Tests gebruiken synthetische gegevens. Een PR naar de ontwikkelbranch voert geen productie-deployment uit.

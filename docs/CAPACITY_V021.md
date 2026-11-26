@@ -1,66 +1,56 @@
-# Capaciteit & beschikbaarheid v0.2.1
+# Capaciteit & beschikbaarheid v0.2.1 — planningsruimte
 
-## Twee afzonderlijke vragen
+## Doel en vijf kolommen
 
-**Planbaarheid** telt betaalde uren in een combinatie van volledige geldige diensten. Een grote inzetenvelop betekent geen extra contractcapaciteit. Dekking = `min(100, maximaal planbare betaalde uren / vereist minimum × 100)`. Bij exacte weekuren zijn minimum en maximum gelijk. Bij flexibele weekuren wordt het minimum als eis en het maximum als harde bovengrens gebruikt. Bij nul vereiste uren tonen we geen percentage (delen door nul); het uurmaximum blijft zichtbaar.
+Deze tab meet beschikbare tijdsruimte om diensten te plaatsen. Zij berekent geen maximaal werkbare betaalde uren, toetst geen volledige dienstcombinaties en genereert geen rooster. De interface toont uitsluitend:
 
-**Flexibiliteit** beschrijft keuzeruimte binnen de berekende regels. Geen opslag van 25% en geen ratio van vrije vensteruren ten opzichte van contracturen. De oude marge wordt niet ingelezen; opgeslagen browserwaarden veranderen de uitkomst niet.
+1. Medewerker / Work Plan: naam met daaronder het werkelijk toegewezen plan.
+2. Betaald / week: vaste uren of minimum–maximum bij flexibele weekuren.
+3. Niet beschikbaar: overlap van samengevoegde Unavailable Times met de inzetvensters.
+4. Planbare ruimte: overgebleven vensteruren na die overlap.
+5. Planbaarheid: percentage ten opzichte van betaalde weekuren inclusief marge, met een tekstuele kleurbetekenis.
 
-## Data en versiegrenzen
+De permanent zichtbare sectie **Toelichting bij de cijfers** beschrijft alle begrippen, flexibele bereiken en kleuren. Inzetvensters blijven intern beschikbaar, maar krijgen geen eigen kolom. Er worden geen dienstvoorbeelden, maximumcapaciteit of flexibiliteitsscores getoond.
 
-De bestaande MU-weekquery koppelt uitsluitend `user.id` en de weeksleutel via `referenceStartWeekDate` en `workPlanLookup`. Zowel de geselecteerde als de vorige week wordt opgevraagd. De vorige toewijzing is alleen grenscontext, nooit een fallback voor de geselecteerde week. Details worden per MU, plan-ID en refresh gedeeld, inclusief lopende verzoeken. Zonder betrouwbare assignment of details is de status **Niet vast te stellen**.
+## Formules en marge
 
-Waarom de vorige week? Een vorige Work Plan kan een zondagse nachtdienst bevatten die maandag nog doorloopt. Zonder die context zouden planwijzigingen ten onrechte een vrije maandag kunnen suggereren. Als de vorige context ontbreekt of een mogelijke dienst daadwerkelijk inloopt, wordt geen definitieve weekberekening getoond. Uitgaande diensten na zondag worden ook niet willekeurig afgeknipt of volledig als deze week geboekt: de status wordt onbekend. Dit vereist later een expliciet weekoverstijgend model met aangrenzende dienstindelingen en regels voor betaalde-urentelling.
+- Planbare ruimte = union van inzetvensters in uren − overlap met de union van Unavailable Times in uren.
+- Benodigde ruimte = betaalde weekuren × (1 + marge / 100).
+- Planbaarheid = planbare ruimte / benodigde ruimte × 100.
 
-## Exacte berekening binnen de ondersteunde regels
+Percentages worden niet begrensd op 100%. Bij 24 betaalde uren, 25% marge en 50 uur planbare ruimte is de benodigde ruimte 30 uur en de indicator 166,7%. Dit betekent extra **planningsruimte**, niet dat de medewerker 50 betaalde uren mag werken.
 
-`src/domain/plannability.ts` is een pure, strikt getypeerde module. Er zijn geen API-calls in de solver. `src/composables/useCapacity.ts` haalt de data via de centrale client op, valideert Unavailable Times en bewaakt selectiewisselingen.
+De marge start op 25%, wordt lokaal bewaard onder `wfm_capacity_margin` en ondersteunt 0–100%. Een geldige opgeslagen marge wordt hergebruikt; ongeldige opslag valt terug op 25%. Lege, negatieve, niet-numerieke en te grote invoer geeft een uitleg zonder percentage. Alleen geldige waarden worden bewaard.
 
-1. Valideer weekuren, maximum werkdagen, optionele/verplichte dagen, dienstregels en activiteitgegevens. Niet herkende inhoudelijke velden worden geweigerd; er wordt geen regel verzonnen of weggegooid om toch een percentage te tonen.
-2. Genereer per lokale startdatum alle toegestane starts, met de expliciete `startIncrementMinutes` bij flexibele starttijden. Genereer alle gehele betaalde minuten tussen minimum en maximum, met betaalde-tijdgranulariteit wanneer ingesteld. Een vaste dienst heeft exact één betaalde duur.
-3. Plaats vaste activiteiten op hun expliciete tijd, relatief aan dienststart of lokale middernacht. Onbetaalde activiteitminuten verlengen de totale dienst maar verhogen het betaalde aantal minuten niet. Activiteiten moeten volledig in de dienst passen en elkaar niet overlappen. Een onbeschikbare periode blokkeert de volledige dienst, inclusief pauzes: de medewerker hoeft tijdens onbeschikbaarheid ook niet in een onbetaalde pauze van een geplande dienst te blijven.
-4. Splits of verkort geen vaste dienst bij overlap. Voeg overlappende Unavailable Times samen en verwijder iedere kandidaatdienst die een periode overlapt. De beschrijvende kolommen tonen de union van volledige dienstvensters en de overlap daarvan, niet een schatting van betaalde capaciteit.
-5. Doorzoek combinaties met maximaal één dienst per lokale startdag, maximaal `maximumDays`, eventueel minimum werkdagen, verplichte dagen en geen overlap. Een nachtshift telt als één dienst op zijn startdag. Elke toestand bevat betaalde minuten, aantal werkdagen, laatste eindtijd, een voorbeeld en het aantal unieke indelingen. Alleen eindtijden die vóór alle toekomstige starts liggen worden samengevoegd; hun toekomstige compatibiliteit is identiek.
-6. Kies het maximum dat niet boven de toegestane betaalde weekuren ligt. Een volledige indeling moet ook het minimum halen. Een voorbeeld gebruikt bij voorkeur de laagste volledige betaalde hoeveelheid; het is geen Genesys-rooster en wordt nooit opgeslagen.
+`CapacityTable.vue` berekent via Vue `computed` de beoordeling uit de opgehaalde ruwe waarden en de huidige marge. Een margewijziging doet **geen** API-verzoek, wist geen resultaten en rekent kleuren/percentages meteen opnieuw uit. Een wijziging van week, MU, sessie of medewerkerslijst maakt de opgehaalde resultaten wel ongeldig.
 
-Unieke indelingen worden onderscheiden op dag, start, einde en betaalde duur. Dubbele templates met identieke tijden en duur tellen niet extra. Varianten met alleen een andere naam of andere vaste activiteiten tellen niet als extra verschuifruimte.
+## Kleuren, ook bij flexibele uren
 
-De rekengrenzen zijn 20.000 gegenereerde dienstvarianten, 20.000 toestanden per dag en 500.000 overgangen. Alle minuutvarianten worden onderzocht, zonder sampling. Bij overschrijding vervalt het **hele** resultaat naar onbekend; een tussentijds gevonden oplossing wordt niet als bewezen maximum gepresenteerd. Indelingentellingen worden begrensd op 10.000 en dan als ‘minstens 10.000’ getoond. Die tellerbegrenzing verandert de haalbaarheid of het maximum niet.
+- Groen: ruimte ≥ betaalde uren inclusief marge, percentage ≥100%.
+- Oranje: betaalde uren ≤ ruimte < betaalde uren inclusief marge.
+- Rood: ruimte < betaalde uren, dus ook zonder marge onvoldoende ruimte.
 
-## Status en flexibiliteit
+Bij flexibele uren worden minimum en maximum afzonderlijk beoordeeld. De onderkant van het percentagebereik hoort bij het hoogste aantal betaalde uren; de bovenkant bij het laagste. De grenslabels en kleuren vermelden uitdrukkelijk welke uren worden beoordeeld. Het maximum is geen stilzwijgende verplichting. Bijvoorbeeld 24–32 betaalde uren met 30 uur ruimte en 25% marge geeft 75–100%: groen bij 24 uur en rood bij 32 uur.
 
-- **Planbaar:** er bestaat een geldige volledige combinatie die het vereiste minimum haalt en het toegestane maximum niet overschrijdt.
-- **Beperkt planbaar:** er bestaan betaalde diensten/combinaties, maar de contracteis wordt niet gehaald.
-- **Niet planbaar:** er bestaat binnen de ondersteunde regels geen geldige combinatie met betaalde uren.
-- **Niet vast te stellen:** ontbrekende/ongeldige input, niet ondersteunde regels, onduidelijke weekgrenscontext of een rekengrens. Maximum, percentage en voorbeeld blijven leeg.
+Bij onbekende uren, ontbrekende/ongeldige plannen of benodigde ruimte van nul uur staat er **—** met uitleg. Binnen een flexibel bereik met minimum nul wordt die grens niet als een percentage getoond; een positieve maximumgrens kan wel apart worden beoordeeld. Een afrondingstolerantie van 1e-9 voorkomt dat een exact 100%-geval door binaire kommagetallen oranje wordt.
 
-Flexibiliteit krijgt zes reproduceerbare punten: mogelijke werkdagen minus de werkdagen van het contractvoorbeeld minstens 1 / minstens 2; verschillende lokale startminuten minstens 2 / minstens 5; volledige contractindelingen minstens 2 / minstens 10. Elk criterium telt één punt. Score 0–1 = Laag, 2–4 = Gemiddeld, 5–6 = Hoog. Zonder volledige contractindeling is de indicatie Laag. Bij onbekende planbaarheid is ook flexibiliteit onbekend. Mogelijke werkdagen en starttijden worden geteld na het verwijderen van lokaal geblokkeerde diensten; het aantal volledige indelingen toetst de combinatiebeperkingen. Dit is een kwalitatieve keuze-indicator, geen optimalisatiescore of extra capaciteit.
+## Weektoewijzing en vensters
 
-## Ondersteund en onzeker
+De bestaande centrale Genesys-client en lookup blijven intact: `user.id` → index vanaf `referenceStartWeekDate` → `workPlanLookupKeysPerWeek` → `workPlanLookup` → echt plan-ID. Een ontbrekende toewijzing wordt nooit vervangen door een eerste/default plan.
 
-Ondersteund: exacte/flexibele betaalde week- en diensturen, maximum werkdagen, `minimumWorkingDaysPerWeek`, expliciete `optionalDays`, toegestane dagen, vaste/flexibele starts met startstap, betaalde-tijdgranulariteit, vast geplaatste betaalde/onbetaalde activiteiten, niet-overlappende diensten, volledige Unavailable Times-overlap, Amsterdamse DST-veilige kloktijdconversie en nachtdiensten binnen de week.
+De huidige en vorige week worden apart opgevraagd met dezelfde MU. De gedeelde detailcache per MU/refresh voorkomt dubbele requests, ook voor gelijktijdige verzoeken of een plan dat in beide weken geldt. De vorige week levert alleen inkomende zondagse nachtdienstvensters; de geselecteerde week levert de vensters van maandag tot en met zondag. Beide worden afgeknipt op de lokale Amsterdamse weekgrenzen en daarna samengevoegd. Zo wordt bij een weekwissel niet ten onrechte het huidige Work Plan op de vorige zondag toegepast. Zonder betrouwbare vorige context worden inkomende vensters niet verzonnen: de ruimte blijft onbekend.
 
-De regels worden geïnterpreteerd binnen het model van maximaal één dienst per startdag. Split shifts of meerdere losse diensten per dag worden niet samengesteld. Ontbrekende `optionalDays` betekent dat de verplichtheid van dagen onvoldoende bekend is, niet dat alle dagen automatisch optioneel zijn.
+Een dienstvenster is een buitenenvelop van vroegste start tot laatste start + maximale betaalde dienstduur + expliciet onbetaalde activiteiten. Exacte starts en duren geven een enkel venster. De lokale starttijd wordt omgezet met Europe/Amsterdam, de duur is verstreken tijd. Dubbele/overlappende templates en Unavailable Times worden verenigd voordat uren worden geteld. Onbeschikbaarheid buiten de vensters telt niet mee; een gedeeltelijke overlap trekt alleen die tijd af en verwijdert niet de hele dienst.
 
-Nog niet volledig ondersteund: flexibele pauzeplaatsing, contiguous-work-regels, actieve rust-/minimumstartafstandregels, dienst-startvarianties, dag-af-regels, weekend-/planningsperioderegels, maximale opeenvolgende werkdagen over weekgrenzen en shifts van meer dan 24 uur. Ook onbekende aanvullende velden maken het resultaat onzeker. Uitgeschakelde `constrain*`-vlaggen zonder actieve bijbehorende parameters veroorzaken op zichzelf geen onzekerheid; betekenisvolle niet-ondersteunde parameters worden conservatief wel afgewezen. Er worden geen verborgen tenant-, rotatie-, override- of historische versieaannames gemaakt.
+Een `constrainDayOff`-vlag is een aanvullende dag-af-regel voor een dienst, geen bewijs dat de betreffende shift zelf een vrije dag is. Zij verwijdert de tijdsenvelop daarom niet. Andere regels zoals maximale werkdagen, verplichte dagen, rust en periodebeperkingen worden niet als roosterbewijs doorgerekend. Ongeldige tijden, onbekende activiteitduur of vensters langer dan 24 uur geven een uitleg zonder betrouwbaar ruimteresultaat. Die 24-uursgrens maakt vorige-zondagcontext voldoende voor inkomende vensters; langere diensten vereisen meer context. DST-ambiguïteit wordt niet gegokt.
 
-De veldbetekenissen voor activiteitplaatsing, granularity en aanvullende constraints zijn gecontroleerd tegen de officiële Genesys Go SDK-modellen (19 november 2026):
-- https://github.com/MyPureCloud/platform-client-sdk-go/blob/master/platformclientv2/workplan.go
-- https://github.com/MyPureCloud/platform-client-sdk-go/blob/master/platformclientv2/workplanshift.go
-- https://github.com/MyPureCloud/platform-client-sdk-go/blob/master/platformclientv2/workplanactivity.go
+## Implementatie en tests
 
-Deze bronnen vervangen geen live acceptatie met de daadwerkelijke tenantregels en historische planversies.
+- `src/domain/capacity.ts`: betaalde weekuren, vensters voor expliciete startdagen, vereniging en intervaloverlap.
+- `src/domain/planningSpace.ts`: pure ruimteberekening en afzonderlijke marge-/kleurbeoordeling.
+- `src/composables/useCapacity.ts`: centrale API-ophaling, huidige/vorige toewijzingen, caching, opslag van marge en bescherming tegen verouderde responses.
+- `src/components/CapacityTable.vue`: vijf kolommen, reactieve berekening, grenslabels, statustekst/tooltips en vaste toelichting.
 
-## Voorbeelden en controles
+Tests dekken vaste/flexibele weekuren, nul/verschillende/ongeldige marges, grenswaarden en percentages boven 100%, overlappende en externe onbeschikbaarheid, nacht- en weekgrensvensters, verschillende plannen tussen weken, ongeldige data, directe herberekening zonder API-calls en behoud van OAuth/editor/roosterweergave. Gebruik `npm test`, `npm run typecheck`, `npm run build` en `npm run test:static`.
 
-| Geval | Uitkomst |
-|---|---|
-| 24 uur, drie vaste diensten van 8 uur | maximaal 24 uur, dekking 100%, lage flexibiliteit |
-| 24 uur, 5 dagen met starts 08–13 uur, vaste duur 8 uur, max. 3 dagen | 65 vensteruren, maximaal 24 betaalde uren, 100%, hoge flexibiliteit |
-| 36 uur, vier diensten van 9 uur | maximaal 36 uur, 100% |
-| Van drie vaste 8-uursdiensten wordt één dienst 1 uur geblokkeerd | maximaal 16 uur, 66,7%; geen ingekorte dienst van 7 uur |
-| 5 ruime vensters met iedere middag een blokkade die elke 8-uursdienst raakt | meer dan 24 vrije vensteruren, maar 0 geldige betaalde uren |
-| Flexibele week 24–32 uur, vier geldige diensten van 8 uur | maximaal 32 uur toegestaan, 100% minimumdekking; voorbeeld van 24 uur |
-| Mogelijke zondagse nachtdienst over een weekgrens | onbekend zonder volledige weekoverstijgende context |
-
-`npm test`, `npm run typecheck`, `npm run build` en `npm run test:static` verifiëren de code. Tests gebruiken synthetische fixtures, waaronder meerdere medewerkers/plannen en opeenvolgende weken. Een browsercontrole moet daarnaast tabwisseling, kolommen, detailfocus, Escape en het behoud van editor-/roosterfuncties controleren. Er worden geen echte API-mutaties uitgevoerd voor de automatische controles.
+**De planbaarheid is een indicator van de beschikbare tijdsruimte. Het is geen garantie dat Genesys Cloud daadwerkelijk een geldig rooster kan genereren. Hierbij spelen ook andere Work Plan-regels een rol, zoals maximale werkdagen, dienstlengtes en rusttijden.**

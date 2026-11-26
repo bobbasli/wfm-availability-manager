@@ -1,14 +1,14 @@
 # Changelog
 
 ## 0.2.1 — in ontwikkeling
-- Vervangen: vensteruren/contracturen met 25% opslag door maximaal planbare betaalde uren uit volledige dienstcombinaties; dekking maximaal 100%.
-- Toegevoegd: pure TypeScript-berekening voor vaste/flexibele uren, startstappen, maximale werkdagen, expliciete optionele/verplichte dagen, vaste betaalde/onbetaalde activiteiten en onbeschikbaarheid.
-- Gescheiden kwalitatieve inzetflexibiliteit op basis van dagen, starts en geldige indelingen, met reproduceerbare uitleg.
-- Nieuwe tienkolomstabel en aanklikbare medewerkerdetails, met onbeschikbaarheid, regels, kandidaatdiensten, redenen en een niet-officieel voorbeeld.
-- Huidige/vorige weektoewijzingen delen dezelfde detailcache; ontbrekende of grensoverschrijdende context geeft expliciet ‘Niet vast te stellen’.
-- Begrensde exacte zoekruimte: bij onbekende regels of limietoverschrijding geen schijnmaximum, percentage of rooster.
-- Bestaande editor, roosters en OAuth behouden; PR-controles gelden ook voor ontwikkelbranches. Geen automatische merge of deployment.
-- Nieuwe unit-/componenttests en technische documentatie: `docs/CAPACITY_V021.md`.
+- Capaciteitstab vereenvoudigd tot vijf kolommen: Medewerker / Work Plan, Betaald / week, Niet beschikbaar, Planbare ruimte en Planbaarheid.
+- Beschikbare tijdsruimte berekend via samengevoegde vensters minus overlappende Unavailable Times; geen maximumcapaciteit of gegenereerde dienstindeling.
+- Instelbare lokaal bewaarde marge (standaard 25%) rekent percentages en kleuren direct opnieuw uit zonder nieuwe API-calls. Percentages boven 100% zijn toegestaan.
+- Flexibele weekuren tonen minimum en maximum met afzonderlijke beoordelingen; nul of onbekende benodigde uren geven — met uitleg.
+- Groen/oranje/rood met tekst en tooltips, plus permanente Nederlandse uitleg onder de tabel.
+- Huidige/vorige Work Plans delen de detailcache en leveren de correcte vensters bij nacht- en weekgrensdiensten.
+- Unit-/componenttests voor overlap, marges, bereiken, onbekende data, direct herberekenen en bestaande functionaliteit. Methode vastgelegd in docs/CAPACITY_V021.md.
+- Geen automatische merge of productie-deployment.
 
 ## Herstelronde 0.2.0
 - Hersteld: verouderde responses bij medewerker-/MU-wissels en verkeerde koppeling tussen editor en medewerker.

@@ -105,9 +105,9 @@ it('berekent capaciteit met eigen weekplannen en haalt gedeelde details één ke
   manager.agents.value=['a','b','c','d'].map(id=>({id:'employee-'+id,name:id}));
   await manager.loadCapacity();
   const rows=manager.capacityRows.value;
-  expect(rows[0]).toMatchObject({planName:'plan-a',calculation:{contract:{min:8,max:8},windowHours:8,coverage:100,maxHours:8}});
-  expect(rows[1]).toMatchObject({planName:'plan-b',calculation:{contract:{min:4,max:4},windowHours:4,coverage:100,maxHours:4}});
-  expect(rows[2]).toMatchObject({planName:'Niet vastgesteld',calculation:{coverage:null,status:'Niet vast te stellen'}});expect(rows[2].calculation.reasons.join()).toContain('lookupsleutel');
+  expect(rows[0]).toMatchObject({planName:'plan-a',space:{paid:{min:8,max:8},windowHours:8,spaceHours:8}});
+  expect(rows[1]).toMatchObject({planName:'plan-b',space:{paid:{min:4,max:4},windowHours:4,spaceHours:4}});
+  expect(rows[2]).toMatchObject({planName:'Niet vastgesteld',space:{spaceHours:null}});expect(rows[2].space.reason).toContain('lookupsleutel');
   expect(fetch.mock.calls.filter(([url])=>url.includes('/workplans/plan-a'))).toHaveLength(1);
   manager.capacityWeek.value='2026-11-02';await manager.loadCapacity();
   expect(manager.capacityRows.value[0].planName).toBe('plan-b');expect(manager.capacityRows.value[1].planName).toBe('plan-a');
@@ -118,5 +118,5 @@ it('toont geen dekking als Work Plan-details niet kunnen worden opgehaald',async
     if(input.includes('/workplans/'))return new Response('{}',{status:403});return json({entities:[]});
   }));
   manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.capacityWeek.value='2026-11-09';manager.agents.value=[{id:'employee-a',name:'A'}];await manager.loadCapacity();
-  expect(manager.capacityRows.value[0].calculation.coverage).toBeNull();expect(manager.capacityRows.value[0].calculation.reasons.join()).toContain('403');
+  expect(manager.capacityRows.value[0].space.spaceHours).toBeNull();expect(manager.capacityRows.value[0].space.reason).toContain('403');
 });
