@@ -25,3 +25,7 @@
 - De vorige toewijzing wordt uitsluitend gebruikt voor inkomende weekgrensvensters, nooit als fallback voor de huidige medewerkerweek.
 - De indicator garandeert geen geldig Genesys-rooster. Maximaal aantal werkdagen, dienstlengtes en rustregels blijven onderdeel van die beperking.
 - PR’s naar alle branches worden getest; alleen push naar main kan deployen. Deze wijziging wordt niet naar main of de testsite gepubliceerd.
+
+- Historie: roostercreatie is nooit eerste publicatie. Alleen eigen agentmetadata mag een agentwijzigingsdatum vullen; een globale wijziging kan iemand anders betreffen.
+- De huidige API-schema's bevatten geen eerste publicatiedatum of Unavailable Time-blokhistorie. De app toont daarvoor ‘Niet beschikbaar’; ook vermoedelijke ongeverifieerde responsevelden worden niet gebruikt.
+- Geen extra auditqueries/scopes totdat service mapping, juiste objectscope en volledigheid van historische gegevens zijn bewezen. Neutrale vergelijking is geen bewijs van actor of oorzaak van een conflict.

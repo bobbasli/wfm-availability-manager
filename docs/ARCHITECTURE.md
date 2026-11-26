@@ -48,3 +48,6 @@ Work Plan-dataflow: `user.id` → kalenderweekindex vanaf `referenceStartWeekDat
 - `src/components/CapacityTable.vue`: vijf kolommen, reactieve percentages/kleuren per grens en permanente toelichting.
 - De experimentele dienstcombinatie-solver en voorbeeldindelingen zijn verwijderd uit de app; andere functionaliteit blijft behouden.
 - Zie [CAPACITY_V021.md](CAPACITY_V021.md) voor de huidige methode en beperkingen.
+
+## Rooster- en beschikbaarheidshistorie
+`src/domain/history.ts` valideert alleen gedocumenteerde metadata en formatteert instants als dd-MM-yyyy HH:mm in Europe/Amsterdam. `ScheduleHistory.vue` toont aanmaak, eerste publicatie (onbekend), roosterbrede wijziging en de eigen agentwijziging afzonderlijk. `AvailabilityHistory.vue` is alleen-lezen in het bestaande bewerkvenster. De bestaande Unavailable Time-response bevat geen betrouwbare blokhistorie; ontbrekende waarden blijven null. Er zijn geen extra API-calls. Zie [HISTORY.md](HISTORY.md) voor de veldmatrix, rechten, auditonderzoek en vergelijkingsbeperkingen.

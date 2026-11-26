@@ -120,3 +120,16 @@ it('toont geen dekking als Work Plan-details niet kunnen worden opgehaald',async
   manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.capacityWeek.value='2026-11-09';manager.agents.value=[{id:'employee-a',name:'A'}];await manager.loadCapacity();
   expect(manager.capacityRows.value[0].space.spaceHours).toBeNull();expect(manager.capacityRows.value[0].space.reason).toContain('403');
 });
+it('houdt geladen historie aan het gekozen rooster en de geselecteerde medewerker gebonden',async()=>{
+  const fetch=vi.fn(async(input:string)=>json(input.endsWith('/agentschedules/query')?{result:{agentSchedules:[{user:{id:'agent-a'},metadata:{dateModified:'2026-11-19T10:00:00Z'}},{user:{id:'agent-b'},metadata:{dateModified:'2026-11-21T12:00:00Z'}}]}}:{id:'schedule-a',published:true,metadata:{dateCreated:'2026-11-10T08:00:00Z',dateModified:'2026-11-21T12:00:00Z'}}));vi.stubGlobal('fetch',fetch);
+  manager.businessUnit.value='bu';manager.managementUnit.value='mu';manager.agentId.value='agent-a';manager.scheduleCandidates.value=[{id:'schedule-a',weekId:'2026-11-09',raw:{}}];manager.selectedSchedule.value='schedule-a';
+  await manager.loadSchedule();
+  expect(manager.scheduleHistory.value.agentModifiedAt).toBe('2026-11-19T10:00:00.000Z');expect(manager.scheduleHistory.value.modifiedAt).toBe('2026-11-21T12:00:00.000Z');expect(manager.scheduleHistory.value.firstPublishedAt).toBeNull();expect(fetch).toHaveBeenCalledTimes(2);
+  manager.agentId.value='agent-b';expect(manager.scheduleHistory.value.agentModifiedAt).toBeNull();expect(manager.scheduleHistory.value.modifiedAt).toBeNull();
+});
+it('stuurt informatieve geschiedenisvelden nooit mee met een editormutatie',async()=>{
+  manager.agentId.value='agent-a';manager.openEditor({original:{id:'synthetic-slot',timeSpan:{startDate:'2026-11-09T08:00:00Z',lengthMinutes:60},notes:'Test',metadata:{dateCreated:'2026-11-01T10:00:00Z',modifiedBy:{id:'synthetic-user'}},dateModified:'2026-11-08T10:00:00Z'}});
+  vi.spyOn(window,'confirm').mockReturnValue(true);const fetch=vi.fn(async()=>json({entities:[]}));vi.stubGlobal('fetch',fetch);
+  await manager.submitChange();
+  expect(Object.keys(JSON.parse(fetch.mock.calls[0][1].body).entities[0]).sort()).toEqual(['delete','id','notes','timeSpan']);vi.restoreAllMocks();
+});
