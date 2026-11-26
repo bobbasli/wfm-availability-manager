@@ -1,4 +1,5 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { readOriginalAvailability } from '../helpers/availabilityComparison';
 import { readScheduleHistory } from '../domain/history';
 import { isPublished } from '../domain/time';
 import {
@@ -40,10 +41,27 @@ export function usePublishedSchedules(context: SelectionContext, service: Availa
       selectedSchedule.value,
     );
   });
+  const comparisonCandidates = ref<ScheduleCandidate[]>([]);
+  const comparisonSchedule = ref('');
+  const originalData = ref<unknown>(null);
+  const originalBusy = ref(false),
+    originalError = ref('');
+  const originalAvailability = computed(() => readOriginalAvailability(originalData.value));
+  let originalVersion = 0;
+  let discoveryPending: { key: string; promise: Promise<void> } | null = null;
+  let schedulePending: { key: string; promise: Promise<void> } | null = null;
   let requestVersion = 0;
 
   function clearSchedule() {
     requestVersion++;
+    originalVersion++;
+    discoveryPending = null;
+    schedulePending = null;
+    comparisonCandidates.value = [];
+    comparisonSchedule.value = '';
+    originalData.value = null;
+    originalBusy.value = false;
+    originalError.value = '';
     scheduleBusy.value = false;
     scheduleData.value = null;
     scheduleError.value = '';
@@ -68,7 +86,7 @@ export function usePublishedSchedules(context: SelectionContext, service: Availa
         activityCodeError.value = `Activity Codes konden niet worden opgehaald: ${errorMessage(error)}`;
     }
   }
-  async function loadSchedule() {
+  async function runLoadSchedule() {
     scheduleData.value = null;
     scheduleDiagnostics.value = null;
     scheduleError.value = '';
@@ -108,7 +126,7 @@ export function usePublishedSchedules(context: SelectionContext, service: Availa
         ? 'Rooster geladen.'
         : agentScheduleRows(response, agent).length
           ? 'Rooster opgehaald; geen diensten zichtbaar binnen de gekozen datums.'
-          : 'Rooster opgehaald; geen roostergegevens voor deze medewerker. Bekijk de diagnose.';
+          : 'Voor deze medewerker en week is geen gepubliceerd rooster beschikbaar.';
     } catch (error) {
       if (current()) {
         scheduleError.value = errorMessage(error);
@@ -118,7 +136,7 @@ export function usePublishedSchedules(context: SelectionContext, service: Availa
       if (current()) scheduleBusy.value = false;
     }
   }
-  async function discoverSchedules() {
+  async function runDiscovery() {
     clearSchedule();
     if (!context.businessUnit.value || !context.agentId.value) return;
     const valid = context.snapshot(),
@@ -128,10 +146,19 @@ export function usePublishedSchedules(context: SelectionContext, service: Availa
     scheduleState.value = 'Gepubliceerde roosters zoeken…';
     void loadActivityCodes();
     try {
-      const response = await service.schedules(context.businessUnit.value);
+      const response = await service.schedules(context.businessUnit.value, context.week.value);
       if (!current()) return;
       const items = responseList(response, ['entities', 'schedules', 'results', 'items']);
       if (!items) throw Error('Roosterresponse heeft een onbekende structuur.');
+      comparisonCandidates.value = items
+        .filter(isRecord)
+        .filter((item) => typeof item.id === 'string' && !!item.id)
+        .map((item) => ({
+          id: text(item.id),
+          weekId: scheduleWeekId(item),
+          name: text(item.name || item.description) || 'Rooster',
+          raw: item,
+        }));
       const eligible = items
         .filter(isRecord)
         .filter((item) => typeof item.id === 'string' && !!item.id && isPublished(item));
@@ -141,13 +168,16 @@ export function usePublishedSchedules(context: SelectionContext, service: Availa
         name: text(item.name || item.description) || 'Gepubliceerd rooster',
         raw: item,
       }));
+      if (comparisonCandidates.value.length === 1)
+        comparisonSchedule.value = comparisonCandidates.value[0].id;
       if (!eligible.length) {
         scheduleState.value =
-          'Geen expliciet gepubliceerd rooster gevonden voor deze Business Unit.';
+          'Voor deze medewerker en week is geen gepubliceerd rooster beschikbaar.';
         return;
       }
       if (eligible.length === 1) {
         selectedSchedule.value = text(eligible[0].id);
+        comparisonSchedule.value = selectedSchedule.value;
         await loadSchedule();
       } else
         scheduleState.value = `${eligible.length} gepubliceerde roosters gevonden. Kies het rooster voor deze week.`;
@@ -160,7 +190,83 @@ export function usePublishedSchedules(context: SelectionContext, service: Availa
       if (current()) scheduleBusy.value = false;
     }
   }
+  function requestKey() {
+    return JSON.stringify([
+      context.businessUnit.value,
+      context.managementUnit.value,
+      context.agentId.value,
+      context.week.value,
+    ]);
+  }
+  function discoverSchedules(): Promise<void> {
+    const key = requestKey();
+    if (discoveryPending?.key === key) return discoveryPending.promise;
+    const promise = runDiscovery();
+    discoveryPending = { key, promise };
+    void promise.finally(() => {
+      if (discoveryPending?.promise === promise) discoveryPending = null;
+    });
+    return promise;
+  }
+  function loadSchedule(): Promise<void> {
+    const key = requestKey() + selectedSchedule.value;
+    if (schedulePending?.key === key) return schedulePending.promise;
+    const promise = runLoadSchedule();
+    schedulePending = { key, promise };
+    void promise.finally(() => {
+      if (schedulePending?.promise === promise) schedulePending = null;
+    });
+    return promise;
+  }
+  async function loadOriginal() {
+    const version = ++originalVersion,
+      valid = context.snapshot(),
+      id = comparisonSchedule.value;
+    originalData.value = null;
+    originalError.value = '';
+    originalBusy.value = false;
+    const candidate = comparisonCandidates.value.find((item) => item.id === id);
+    if (!candidate || !context.agentId.value || !context.businessUnit.value || !context.token.value)
+      return;
+    const week = scheduleWeekId(candidate);
+    if (!week) {
+      originalError.value =
+        'Original kan niet worden opgehaald: de startweek van het rooster ontbreekt.';
+      return;
+    }
+    const current = () => version === originalVersion && valid() && comparisonSchedule.value === id;
+    originalBusy.value = true;
+    try {
+      const response = await service.originalUnavailable(
+        context.businessUnit.value,
+        context.agentId.value,
+        id,
+        week,
+      );
+      if (current()) originalData.value = response;
+    } catch (error) {
+      if (current()) originalError.value = `Original ophalen mislukt: ${errorMessage(error)}`;
+    } finally {
+      if (current()) originalBusy.value = false;
+    }
+  }
+  watch(
+    comparisonSchedule,
+    () => {
+      void loadOriginal();
+    },
+    { flush: 'sync' },
+  );
+  watch(selectedSchedule, (id) => {
+    if (comparisonCandidates.value.some((item) => item.id === id)) comparisonSchedule.value = id;
+  });
   return {
+    comparisonCandidates,
+    comparisonSchedule,
+    originalData,
+    originalBusy,
+    originalError,
+    originalAvailability,
     scheduleData,
     scheduleError,
     scheduleBusy,

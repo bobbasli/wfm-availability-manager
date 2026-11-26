@@ -25,7 +25,8 @@ const config = JSON.parse(readFileSync('tsconfig.json', 'utf8'));
 assert.equal(config.compilerOptions.strict, true);
 assert.equal(config.compilerOptions.allowJs, false);
 assert.match(readFileSync('src/App.vue', 'utf8'), /CalendarView/);
-assert.match(readFileSync('src/components/AppHeader.vue', 'utf8'), /v0\.3\.0/);
+const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+assert.ok(readFileSync('src/components/AppHeader.vue', 'utf8').includes(`v${version}`));
 assert.match(readFileSync('src/services/genesysApi.ts', 'utf8'), /onUnauthorized/);
 console.log(
   'Architecture checks passed: typed Vue/TS, strict configuration, central HTTP boundary.',

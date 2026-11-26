@@ -1,4 +1,4 @@
-# Architectuur — v0.3.0
+# Architectuur — v0.3.1
 
 ## Structuur
 
@@ -49,3 +49,8 @@ Prettier is uitsluitend ontwikkelgereedschap; `npm run format` en `format:check`
 Vite base `./` ondersteunt beide repositorypaden. CI bouwt en test PR's; alleen push naar `main` kan Pages publiceren. De oorspronkelijke bronrepository-main blijft onaangeraakt. De testrepository heeft een afzonderlijke release-PR. Zie [DEPLOYMENT_V03.md](DEPLOYMENT_V03.md).
 
 Live Genesys-login, rechten, daadwerkelijke weekrotaties/overrides en historische planversies blijven acceptatiepunten. Audit Logs zijn niet toegevoegd. Eerste roosterpublicatie en Unavailable Time-historie zijn volgens de huidige endpointcontracten niet beschikbaar; zie HISTORY.md. Een groene test/build vervangt deze live controle niet.
+
+## Navigatie en Original/Latest Saved v0.3.1
+`useWeekSelection` is de gedeelde maandagweek voor capaciteit en kalender. `WeekNavigation` verzorgt datumselectie en vorige/volgende week. Een medewerkersknop in CapacityTable geeft een User-ID aan de coordinator, die de kalender opent en onafhankelijke loaders gebundeld start. Lopende identieke aanvragen worden gedeeld; de bestaande selectieversies blijven leidend.
+
+`usePublishedSchedules` vraagt de geselecteerde week op en houdt gepubliceerde kalenderkeuze gescheiden van Original-vergelijkingscontext (ook ongepubliceerd). `availability.ts` bevat de officiële Original-query. De pure helper `availabilityComparison.ts` valideert, verenigt en vergelijkt intervallen per Amsterdamse dag. `UnavailableComparison` presenteert beide datasets en de verschillen. Succesvolle editormutaties melden invalidatie aan de capacity-coordinator, die alleen bij terugkeer ververst. Zie AVAILABILITY_COMPARISON.md voor contracten en beperkingen.

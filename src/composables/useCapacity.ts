@@ -7,6 +7,7 @@ import { createWorkPlanDetailsLoader, queryAgentWorkPlans } from '../services/wo
 import { calculatePlanningSpace, unknownSpace, validMargin } from '../domain/planningSpace';
 import { workPlanHours, type Interval } from '../domain/capacity';
 import { localParts } from '../domain/time';
+import { mondayOfWeek as monday } from '../helpers/week';
 
 interface CapacityConfig {
   businessUnit: Ref<string>;
@@ -14,15 +15,9 @@ interface CapacityConfig {
   token: Ref<string>;
   agents: Ref<unknown>;
   request: RequestFunction;
+  week?: Ref<string>;
 }
 
-function monday(date: string): string {
-  const day = new Date(date + 'T12:00:00Z');
-  if (!Number.isFinite(+day) || day.toISOString().slice(0, 10) !== date)
-    throw Error('Kies een geldige week.');
-  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
-  return day.toISOString().slice(0, 10);
-}
 export function unavailablePeriods(response: unknown): Interval[] {
   const list = Array.isArray(response)
     ? response
@@ -59,7 +54,7 @@ export function useCapacity(config: CapacityConfig) {
     },
     { flush: 'sync' },
   );
-  const capacityWeek = ref(monday(localParts(Date.now()).date));
+  const capacityWeek = config.week ?? ref(monday(localParts(Date.now()).date));
   const capacityBusy = ref(false),
     capacityProgress = ref(''),
     capacityError = ref('');
@@ -77,6 +72,11 @@ export function useCapacity(config: CapacityConfig) {
     },
     { flush: 'sync' },
   );
+  function invalidateCapacity() {
+    version++;
+    capacityRows.value = [];
+    capacityProgress.value = 'Beschikbaarheid gewijzigd; capaciteit moet opnieuw worden opgehaald.';
+  }
   async function loadCapacity() {
     if (
       capacityBusy.value ||
@@ -226,5 +226,6 @@ export function useCapacity(config: CapacityConfig) {
     capacityRows,
     capacityDiagnostics,
     loadCapacity,
+    invalidateCapacity,
   };
 }

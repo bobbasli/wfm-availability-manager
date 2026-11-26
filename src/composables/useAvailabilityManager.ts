@@ -2,13 +2,10 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { createGenesysApi } from '../services/genesysApi';
 import { createAvailabilityService } from '../services/availability';
 import { localDayBounds } from '../domain/time';
-import {
-  calendarDays,
-  initialDateRange,
-  unavailableRecords,
-  unavailableSegments,
-} from '../helpers/calendar';
+import { calendarDays, unavailableRecords, unavailableSegments } from '../helpers/calendar';
 import { errorMessage, object, text } from '../helpers/response';
+import { compareAvailability } from '../helpers/availabilityComparison';
+import { useWeekSelection } from './useWeekSelection';
 import { useCapacity } from './useCapacity';
 import { useGenesysSession } from './useGenesysSession';
 import { usePublishedSchedules } from './usePublishedSchedules';
@@ -18,7 +15,7 @@ import type { ActiveTab, ScheduleDay } from '../types/availability';
 
 /** Coordinates selection and cancellation; data access, auth and editor have separate owners. */
 export function useAvailabilityManager() {
-  const activeTab = ref<ActiveTab>('calendar');
+  const activeTab = ref<ActiveTab>('capacity');
   const identity = ref('Niet aangemeld');
   const businessUnits = ref<GenesysEntity[]>([]),
     managementUnits = ref<GenesysEntity[]>([]),
@@ -26,9 +23,8 @@ export function useAvailabilityManager() {
   const businessUnit = ref(''),
     managementUnit = ref(''),
     agentId = ref('');
-  const range = initialDateRange();
-  const start = ref(range.start),
-    end = ref(range.end);
+  const { week, start, end, weekError, moveWeek } = useWeekSelection();
+  const capacityDirty = ref(false);
   const lastResponse = ref<unknown>(null),
     raw = ref('Nog geen response.');
   const status = ref('Klaar.'),
@@ -48,7 +44,14 @@ export function useAvailabilityManager() {
     },
   });
   const service = createAvailabilityService(client.request, client.pages);
-  const selection = { businessUnit, managementUnit, agentId, token, snapshot: selectionSnapshot };
+  const selection = {
+    businessUnit,
+    managementUnit,
+    agentId,
+    token,
+    week,
+    snapshot: selectionSnapshot,
+  };
   const schedules = usePublishedSchedules(selection, service);
   const capacity = useCapacity({
     businessUnit,
@@ -56,6 +59,7 @@ export function useAvailabilityManager() {
     token,
     agents,
     request: client.request,
+    week,
   });
   const editor = useUnavailableEditor(
     {
@@ -67,8 +71,29 @@ export function useAvailabilityManager() {
       snapshot: selectionSnapshot,
       report: setStatus,
       refresh: loadUnavailable,
+      onSaved: (id) => {
+        if (agentId.value === id) lastResponse.value = null;
+        if (agents.value.some((agent) => agent.id === id)) {
+          capacityDirty.value = true;
+          capacity.invalidateCapacity();
+        }
+      },
     },
     service,
+  );
+  const availabilityComparison = computed(() => {
+    try {
+      return compareAvailability(
+        schedules.originalAvailability.value,
+        lastResponse.value,
+        week.value,
+      );
+    } catch {
+      return [];
+    }
+  });
+  const calendarBusy = computed(
+    () => busy.value || schedules.scheduleBusy.value || schedules.originalBusy.value,
   );
   const records = computed(() => unavailableRecords(lastResponse.value));
   const normalized = computed(() => unavailableSegments(lastResponse.value));
@@ -85,6 +110,8 @@ export function useAvailabilityManager() {
       ),
     })),
   );
+  let calendarLoadQueued = false;
+  let unavailablePending: { key: string; promise: Promise<boolean | undefined> } | null = null;
   let selectionVersion = 0,
     unavailableRequest = 0,
     managementRequest = 0,
@@ -107,7 +134,8 @@ export function useAvailabilityManager() {
     schedules.clearSchedule();
     raw.value = 'Nog geen response.';
     capacity.capacityRows.value = [];
-    activeTab.value = 'calendar';
+    activeTab.value = 'capacity';
+    capacityDirty.value = false;
     identity.value = 'Niet aangemeld';
     businessUnits.value = [];
     businessUnit.value = '';
@@ -123,10 +151,7 @@ export function useAvailabilityManager() {
     lastResponse.value = null;
     schedules.clearSchedule();
     editor.closeEditor();
-    if (agentId.value) {
-      void loadUnavailable();
-      void schedules.discoverSchedules();
-    }
+    queueCalendarLoad();
   }
   async function initialize() {
     if (!token.value) return;
@@ -212,7 +237,7 @@ export function useAvailabilityManager() {
       if (current()) setStatus(errorMessage(error), true);
     }
   }
-  async function loadUnavailable(): Promise<boolean | undefined> {
+  async function runLoadUnavailable(): Promise<boolean | undefined> {
     if (!agentId.value || !token.value) return;
     const agent = agentId.value,
       valid = selectionSnapshot(),
@@ -246,10 +271,45 @@ export function useAvailabilityManager() {
     },
     { flush: 'sync' },
   );
-  watch([start, end], () => {
-    if (agentId.value) {
-      void loadUnavailable();
-      void schedules.discoverSchedules();
+  function queueCalendarLoad() {
+    if (calendarLoadQueued) return;
+    calendarLoadQueued = true;
+    void Promise.resolve().then(() => {
+      calendarLoadQueued = false;
+      if (agentId.value && token.value && !weekError.value) {
+        void loadUnavailable();
+        void schedules.discoverSchedules();
+      }
+    });
+  }
+  function loadUnavailable(): Promise<boolean | undefined> {
+    const key = JSON.stringify([selectionVersion, agentId.value, start.value, end.value]);
+    if (unavailablePending?.key === key) return unavailablePending.promise;
+    const promise = runLoadUnavailable();
+    unavailablePending = { key, promise };
+    void promise.finally(() => {
+      if (unavailablePending?.promise === promise) unavailablePending = null;
+    });
+    return promise;
+  }
+  function openEmployeeCalendar(id: string) {
+    if (!agents.value.some((agent) => agent.id === id)) {
+      setStatus('Deze medewerker staat niet meer in de geselecteerde Management Unit.', true);
+      return;
+    }
+    if (id === agentId.value && graphSupported.value && !calendarBusy.value) {
+      activeTab.value = 'calendar';
+      return;
+    }
+    agentId.value = id;
+    activeTab.value = 'calendar';
+    resetAgentData();
+  }
+  watch([start, end], queueCalendarLoad, { flush: 'sync' });
+  watch([activeTab, capacity.capacityBusy], ([tab, loading]) => {
+    if (tab === 'capacity' && capacityDirty.value && !loading) {
+      capacityDirty.value = false;
+      void capacity.loadCapacity();
     }
   });
   onMounted(async () => {
@@ -264,6 +324,12 @@ export function useAvailabilityManager() {
   });
   return {
     activeTab,
+    weekError,
+    moveWeek,
+    openEmployeeCalendar,
+    calendarBusy,
+    availabilityComparison,
+    capacityDirty,
     identity,
     businessUnits,
     managementUnits,

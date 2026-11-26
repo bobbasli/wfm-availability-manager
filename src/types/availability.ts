@@ -10,6 +10,7 @@ export interface SelectionContext {
   agentId: Ref<string>;
   token: Ref<string>;
   snapshot: SelectionSnapshot;
+  week: Ref<string>;
 }
 export interface UnavailableBlock {
   id?: string;
@@ -70,4 +71,17 @@ export interface EditorContext {
   snapshot: SelectionSnapshot;
   report: StatusReporter;
   refresh: () => Promise<boolean | undefined>;
+  onSaved?: (agentId: string) => void;
+}
+
+export interface OriginalAvailability {
+  considered: boolean | null;
+  periods: [number, number][] | null;
+  reason: string | null;
+}
+export interface AvailabilityComparisonDay {
+  date: string;
+  original: string;
+  latest: string;
+  difference: 'Gelijk' | 'Gewijzigd' | 'Niet te vergelijken';
 }

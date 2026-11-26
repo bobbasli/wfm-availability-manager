@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WeekNavigation from '../components/WeekNavigation.vue';
 import CapacityTable from '../components/CapacityTable.vue';
 import type { AvailabilityManager } from '../composables/useAvailabilityManager';
 const props = defineProps<{ manager: AvailabilityManager }>();
@@ -13,6 +14,9 @@ const {
   loadCapacity,
   managementUnit,
   agents,
+  weekError,
+  moveWeek,
+  openEmployeeCalendar,
 } = props.manager;
 </script>
 <template>
@@ -41,9 +45,7 @@ const {
         v-model.number="capacityMargin"
         class="input mt-1"
     /></label>
-    <label class="block text-sm font-medium max-w-xs"
-      >Week vanaf (maandag)<input type="date" v-model="capacityWeek" class="input mt-1"
-    /></label>
+    <WeekNavigation v-model="capacityWeek" :error="weekError" @move="moveWeek" />
     <p class="text-sm text-soft">
       {{ capacityProgress || 'Selecteer een Management Unit en haal het overzicht op.' }}
     </p>
@@ -62,6 +64,6 @@ const {
     >
       {{ capacityError }}
     </p>
-    <CapacityTable :rows="capacityRows" :margin="capacityMargin" />
+    <CapacityTable :rows="capacityRows" :margin="capacityMargin" @employee="openEmployeeCalendar" />
   </section>
 </template>

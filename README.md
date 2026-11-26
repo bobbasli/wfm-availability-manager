@@ -1,4 +1,4 @@
-# WFM Availability Manager — v0.3.0
+# WFM Availability Manager — v0.3.1 (in ontwikkeling)
 
 Nederlandstalige Genesys Cloud Supervisor Client App met Unavailable Times-editor, gepubliceerde roosters, roosterhistorie en inzicht in beschikbare planningsruimte. Vue 3 Composition API, strikt TypeScript, Vite en Tailwind CSS. Geen eigen backend en geen client secret.
 
@@ -61,3 +61,8 @@ De gedeelde Work Plan-response uit de ontwikkelsessie bevestigt 08:00–09:00 st
 - [CAPACITY_V021.md](docs/CAPACITY_V021.md): ongewijzigde rekenmethode.
 - [HISTORY.md](docs/HISTORY.md): betrouwbare tijdstempels en ontbrekende API-velden.
 - [DECISIONS.md](docs/DECISIONS.md) en [CHANGELOG.md](CHANGELOG.md): keuzes en wijzigingen.
+
+## Navigatie en vergelijking v0.3.1
+Capaciteit is standaard actief. Klik op een medewerkersnaam om diens kalender voor dezelfde maandagweek te openen. Beide tabs delen datumselectie en vorige/volgende week; actuele capaciteitsgegevens blijven bij terugkeer behouden. Na een bevestigde beschikbaarheidswijziging wordt capaciteit bij terugkeer vernieuwd.
+
+De kalender vergelijkt **Original** (gebruikt bij generatie van het gekozen rooster) met **Latest Saved** (actueel opgeslagen), per dag in Europe/Amsterdam. Een afzonderlijke selector ondersteunt ook ongepubliceerde roosters als vergelijkingscontext; kalenderdiensten blijven uitsluitend gepubliceerd. `consideredInScheduleGeneration=false` betekent **Niet gebruikt**, nooit automatisch beschikbaar. Dit levert geen aanmaak-/wijzigingsdatums of actor per blok. [Methode, exacte requestbody, rechten en beperkingen](docs/AVAILABILITY_COMPARISON.md). Alleen een ontwikkel-PR; deze wijziging publiceert niets.

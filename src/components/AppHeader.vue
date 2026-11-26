@@ -8,7 +8,7 @@ const emit = defineEmits<{ login: []; logout: []; theme: [] }>();
     <div class="max-w-6xl mx-auto flex flex-wrap justify-between gap-4 items-center">
       <div>
         <h1 class="text-2xl font-bold">
-          WFM Availability Manager <span class="text-sm font-normal text-slate-300">v0.3.0</span>
+          WFM Availability Manager <span class="text-sm font-normal text-slate-300">v0.3.1</span>
         </h1>
         <p class="text-sm text-slate-300">
           Genesys Cloud · Agent Unavailable Times · Vue 3 + Tailwind CSS

@@ -101,3 +101,26 @@ it('toont — met reden voor ontbrekende toewijzing en een ongeldige marge', () 
     app.unmount();
   }
 });
+
+it('stuurt de User-ID door bij een klik, ook bij identieke medewerkersnamen', () => {
+  const selected: string[] = [],
+    root = document.createElement('div');
+  const app = createApp(CapacityTable, {
+    rows: [
+      { id: 'agent-a', name: 'Gelijke naam', planName: 'Plan', space },
+      { id: 'agent-b', name: 'Gelijke naam', planName: 'Plan', space },
+    ],
+    margin: 25,
+    onEmployee: (id: string) => selected.push(id),
+  });
+  app.mount(root);
+  try {
+    const buttons = root.querySelectorAll<HTMLButtonElement>('tbody button');
+    expect(buttons).toHaveLength(2);
+    buttons[1].click();
+    expect(selected).toEqual(['agent-b']);
+    expect(buttons[1].className).toContain('underline');
+  } finally {
+    app.unmount();
+  }
+});

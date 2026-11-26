@@ -20,7 +20,15 @@ export function createAvailabilityService(
     updateUnavailable: (id: string, body: unknown) =>
       request(`${wfm}/agents/${encode(id)}/unavailabletimes`, 'PATCH', body),
     activityCodes: (bu: string) => request(`${wfm}/businessunits/${encode(bu)}/activitycodes`),
-    schedules: (bu: string) => request(`${wfm}/businessunits/${encode(bu)}/weeks/recent/schedules`),
+    schedules: (bu: string, week: string) =>
+      request(
+        `${wfm}/businessunits/${encode(bu)}/weeks/${encode(week)}/schedules?includeOnlyPublished=false`,
+      ),
+    originalUnavailable: (bu: string, agentId: string, id: string, weekDate: string) =>
+      request(`${wfm}/businessunits/${encode(bu)}/unavailabletimes/schedules/query`, 'POST', {
+        agentId,
+        schedule: { id, weekDate },
+      }),
     schedule: (bu: string, week: string, id: string) => request(schedulePath(bu, week, id)),
     agentSchedule: (bu: string, week: string, id: string, mu: string, agent: string) =>
       request(`${schedulePath(bu, week, id)}/agentschedules/query`, 'POST', {

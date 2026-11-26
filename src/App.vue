@@ -95,7 +95,7 @@ const { dark, toggleTheme } = useTheme();
       </section>
     </main>
     <footer class="text-center text-xs text-muted py-6">
-      WFM Availability Manager v0.3.0 · Geen eigen backend
+      WFM Availability Manager v0.3.1 · Geen eigen backend
     </footer>
   </div>
 </template>

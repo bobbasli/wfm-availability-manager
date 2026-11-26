@@ -35,3 +35,10 @@
 - Strikte TypeScript-migratie met afzonderlijke sessie-, rooster- en editorcomposables; pure parsers in helpers en businesslogica in domain.
 - Tailwind 3 behouden en voorbeeldstijlen naar de bestaande syntax vertaald; licht/donker-keuze met Vue/localStorage. Heroicons voor beschikbare iconen; geen extra UI-/statebibliotheek voor reeds geteste kleine controls.
 - Nieuwe release- en herstelbuild en herstel-tag. Ontwikkel-PR naar ontwikkelbranch; aparte PR naar testrepository-main voor expliciete deployment door de gebruiker. Geen automatische merge/deploy.
+
+## v0.3.1 — navigatie en onbeschikbaarheidsvergelijking
+- Eén maandagweek voor beide tabs; capaciteit standaard, medewerkerdoorklik uitsluitend via User-ID. Geen wijziging aan formule, kolommen, kleuren of uitleg.
+- Original-query bevestigd uit officiële modellen: agentId plus schedule{id,weekDate}; considered=false blijft Niet gebruikt.
+- Ongepubliceerde roosters kunnen uitsluitend vergelijkingscontext zijn. Kalenderdiensten blijven expliciet gepubliceerd en alleen-lezen.
+- Verschillen van tijdvakken zijn geen blokhistorie. Eerste publicatie en unavailable created/modified/actor blijven onbekend.
+- Succesvolle PATCH invalideert capaciteit en ververst bij terugkeer; annuleringen doen dat niet. Geen automatische merge of deployment.

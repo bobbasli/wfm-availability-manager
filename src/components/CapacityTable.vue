@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import type { CapacityRow } from '../composables/useCapacity';
 import { assessPlanningSpace, type SpaceBoundary, type SpaceStatus } from '../domain/planningSpace';
 const props = defineProps<{ rows: CapacityRow[]; margin: unknown }>();
+const emit = defineEmits<{ employee: [userId: string] }>();
 const rows = computed(() =>
   props.rows.map((row) => ({ ...row, assessment: assessPlanningSpace(row.space, props.margin) })),
 );
@@ -41,8 +42,15 @@ const tooltip = (value: SpaceBoundary) =>
           class="border-b border-slate-100 dark:border-slate-800"
         >
           <th scope="row" class="p-3 text-left font-medium">
-            {{ row.name
-            }}<span class="block text-xs text-muted font-normal">{{ row.planName }}</span>
+            <button
+              type="button"
+              class="text-indigo-700 dark:text-indigo-300 underline underline-offset-2 hover:no-underline text-left"
+              @click="emit('employee', row.id)"
+              :aria-label="`Beschikbaarheid en rooster van ${row.name} bekijken`"
+            >
+              {{ row.name }}</button><span class="block text-xs text-muted font-normal">{{
+              row.planName
+            }}</span>
           </th>
           <td class="p-3 text-right whitespace-nowrap">
             <template v-if="row.space.paid">{{

@@ -76,3 +76,6 @@ Go SDK commit onderzocht: `b6022b3b2cba93b670cec6ee571ecbd21f536f82`.
 - https://github.com/MyPureCloud/platform-client-sdk-go/blob/b6022b3b2cba93b670cec6ee571ecbd21f536f82/platformclientv2/unavailabletimelisting.go
 - https://github.com/MyPureCloud/platform-client-sdk-javascript/blob/12c531f528e6445b6d5947ce22ef27125d195835/build/docs/WorkforceManagementApi.md
 - https://github.com/MyPureCloud/platform-client-sdk-javascript/blob/12c531f528e6445b6d5947ce22ef27125d195835/build/docs/AuditApi.md
+
+## Aanvulling v0.3.1: gegevenssets bij roostergeneratie
+De nieuwe Original-query maakt de bij roostergeneratie gebruikte onbeschikbaarheid vergelijkbaar met Latest Saved, ook bij een ongepubliceerde vergelijkingscontext. Dit corrigeert de eerdere te brede indruk dat zulke snapshots niet beschikbaar zouden zijn. De eerdere conclusie over ontbrekende **blokhistorietijdstempels** blijft juist: de nieuwe modellen bevatten alleen een considered-boolean, tijdvakken en notities. Een tijdvakverschil bewijst geen wijzigingsdatum, actor of eerste publicatie. Zie [AVAILABILITY_COMPARISON.md](AVAILABILITY_COMPARISON.md) voor de exacte body en bronnen.

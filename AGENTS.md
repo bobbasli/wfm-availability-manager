@@ -25,6 +25,9 @@ Lees vóór elke wijziging `README.md`, `docs/ARCHITECTURE.md`, `docs/GENESYS_AP
 - Toon uitsluitend vijf kolommen en vaste toelichting conform docs/CAPACITY_V021.md. Beoordeel vaste/flexibele weekuren met groen/oranje/rood en tekst per grens. Onbekende input of nul benodigde ruimte geeft —; ontbrekende weektoewijzingen worden nooit gegokt. Leg expliciet uit dat planningsruimte geen garantie op een geldig rooster is.
 - Resultaten en API-errors zichtbaar en navolgbaar; geen verzonnen resultaten of stilzwijgende defaults.
 
+- Vanaf v0.3.1: capaciteit standaard actief; medewerkerdoorklik via User-ID, gedeelde maandagweek en geen herophaling bij ongewijzigde terugkeer. Een succesvolle PATCH invalideert capaciteit; annulering niet.
+- Original en Latest Saved zijn afzonderlijke gegevenssets. Gebruik het officiële `agentId` + `schedule:{id,weekDate}`-contract; `consideredInScheduleGeneration=false` is Niet gebruikt, nooit automatisch Beschikbaar. Ongepubliceerde roosters zijn uitsluitend vergelijkingscontext, geen kalenderdiensten. Zie docs/AVAILABILITY_COMPARISON.md.
+
 ## Werkwijze
 1. Werk op feature branch; gebruik pull requests. `main` triggert GitHub Pages-productiedeployment.
 2. Beschrijf de wijziging, geraakte bestanden, tests en risico's in de PR.

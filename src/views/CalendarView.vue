@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import WeekNavigation from '../components/WeekNavigation.vue';
+import UnavailableComparison from '../components/UnavailableComparison.vue';
 import ScheduleHistory from '../components/ScheduleHistory.vue';
 import WeekTimeline from '../components/WeekTimeline.vue';
 import type { AvailabilityManager } from '../composables/useAvailabilityManager';
@@ -25,6 +27,17 @@ const {
   busy,
   token,
   loadUnavailable,
+  capacityWeek,
+  weekError,
+  moveWeek,
+  calendarBusy,
+  comparisonCandidates,
+  comparisonSchedule,
+  originalBusy,
+  originalError,
+  originalAvailability,
+  availabilityComparison,
+  originalData,
 } = props.manager;
 </script>
 <template>
@@ -49,13 +62,13 @@ const {
         </button>
       </div>
     </div>
-    <div class="grid md:grid-cols-2 gap-4">
-      <label class="text-sm font-medium"
-        >Vanaf<input type="date" v-model="start" class="input mt-1" /></label
-      ><label class="text-sm font-medium"
-        >Tot en met<input type="date" v-model="end" class="input mt-1"
-      /></label>
-    </div>
+    <WeekNavigation v-model="capacityWeek" :error="weekError" @move="moveWeek" />
+    <p class="text-sm text-soft">
+      {{ start.split('-').reverse().join('-') }} t/m {{ end.split('-').reverse().join('-') }}
+    </p>
+    <p v-if="calendarBusy" role="status" aria-live="polite" class="text-sm text-soft">
+      Beschikbaarheid en rooster ophalen…
+    </p>
     <div class="flex flex-wrap gap-4 text-xs">
       <span class="flex items-center gap-2"
         ><i class="inline-block h-3 w-3 rounded bg-rose-500"></i>Unavailable Times · bewerken</span
@@ -108,6 +121,14 @@ const {
       :token="token"
       @edit="openEditor"
     />
+    <UnavailableComparison
+      v-model="comparisonSchedule"
+      :days="availabilityComparison"
+      :candidates="comparisonCandidates"
+      :busy="originalBusy"
+      :error="originalError"
+      :reason="originalAvailability.reason"
+    />
     <details class="text-sm">
       <summary class="cursor-pointer font-semibold">Rooster API-diagnose</summary>
       <pre class="mt-2 surface-muted p-3 rounded text-xs whitespace-pre-wrap break-all">{{
@@ -116,6 +137,7 @@ const {
             candidates: scheduleCandidates,
             diagnostics: scheduleDiagnostics,
             response: scheduleData,
+            originalResponse: originalData,
           },
           null,
           2,

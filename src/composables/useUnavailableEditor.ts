@@ -119,6 +119,7 @@ export function useUnavailableEditor(context: EditorContext, service: Availabili
       current = editorCurrent;
     try {
       await service.updateUnavailable(agent, { entities: [entity] });
+      context.onSaved?.(agent);
       if (!current()) return;
       closeEditor();
       const refreshed = await context.refresh();

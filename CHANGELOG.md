@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — in ontwikkeling
+- Capaciteit als standaardtab en aanklikbare medewerkersnamen via Genesys User-ID.
+- Gedeelde maandagweek, vorige/volgende week, juiste doorklik over kalenderjaren en automatische onafhankelijke ophaling van beschikbaarheid en weekrooster.
+- Original/Latest Saved-vergelijking met het officiële agentId + schedule{id,weekDate}-contract; false betekent Niet gebruikt, niet volledig beschikbaar.
+- Weekgebonden roosterlisting, alleen gepubliceerde kalenderdiensten en aparte vergelijkingskeuze voor ook ongepubliceerde roosters.
+- Gedeelde lopende requests, negeren van late responses en behouden van actuele capaciteit; succesvolle editorwijzigingen maken capaciteit ongeldig voor verversing bij terugkeer.
+- Bestaande capaciteitsformule, vijf kolommen, kleuren, marge en toelichting behouden; geen verzonnen historievelden of extra auditcalls.
+- Tests en technische documentatie voor navigatie, API-contract, verschillen, overlap, DST, jaargrenzen, requestaantallen en foutisolatie. Geen merge of deployment.
+
+
 ## 0.3.0 — 2026-11-26 (testrelease)
 - Volledige applicatiecode naar strict TypeScript; alle Vue-componenten met script setup en Composition API, geen legacy JS of allowJs.
 - Kalender, capaciteit, medewerkerselectie, header en editor opgesplitst in views/componenten; sessie, gepubliceerde roosters en editor hebben eigen composables.
