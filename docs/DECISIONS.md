@@ -29,3 +29,9 @@
 - Historie: roostercreatie is nooit eerste publicatie. Alleen eigen agentmetadata mag een agentwijzigingsdatum vullen; een globale wijziging kan iemand anders betreffen.
 - De huidige API-schema's bevatten geen eerste publicatiedatum of Unavailable Time-blokhistorie. De app toont daarvoor ‘Niet beschikbaar’; ook vermoedelijke ongeverifieerde responsevelden worden niet gebruikt.
 - Geen extra auditqueries/scopes totdat service mapping, juiste objectscope en volledigheid van historische gegevens zijn bewezen. Neutrale vergelijking is geen bewijs van actor of oorzaak van een conflict.
+
+## v0.3.0 — herstructurering
+- Bouw vanaf de gepubliceerde testbasis 57541d9, niet vanaf de onbevestigde rekenwijziging in PR #5. De aangeleverde Work Plan-startgrenzen bevestigen 47,5 uur/95%; de formule blijft ongewijzigd.
+- Strikte TypeScript-migratie met afzonderlijke sessie-, rooster- en editorcomposables; pure parsers in helpers en businesslogica in domain.
+- Tailwind 3 behouden en voorbeeldstijlen naar de bestaande syntax vertaald; licht/donker-keuze met Vue/localStorage. Heroicons voor beschikbare iconen; geen extra UI-/statebibliotheek voor reeds geteste kleine controls.
+- Nieuwe release- en herstelbuild en herstel-tag. Ontwikkel-PR naar ontwikkelbranch; aparte PR naar testrepository-main voor expliciete deployment door de gebruiker. Geen automatische merge/deploy.

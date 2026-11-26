@@ -47,3 +47,6 @@ De centrale HTTP-module voert ook de OAuth-tokenuitwisseling uit. Alleen explici
 
 ## Historietijdstempels
 Roosters leveren `metadata.dateCreated` en `metadata.dateModified`; agentroosters leveren hun eigen `metadata.dateModified` in de via `user.id` geselecteerde rij. De bestaande roostermetadata heeft geen eerste publicatiedatum; `published` is alleen een boolean. `UnavailableTime` documenteert geen created/modified/actor-velden. Deze ontbrekende waarden krijgen geen fallback. Auditqueries vereisen `audits:audit:view`, maar worden niet automatisch aangeroepen zonder geverifieerde mapping en historievolledigheid. Zie [de volledige veldmatrix en officiële bronnen](HISTORY.md).
+
+## v0.3.0 — technische herstructurering
+De bestaande endpoints zijn ongewijzigd. `services/availability.ts` bevat nu de kalender-/rooster-/selectieaanroepen boven `genesysApi.ts`. Onbekende responses worden door helpers gevalideerd en omgezet naar getypeerde kalender-/editorstructuren. Er zijn geen auditcalls, nieuwe scopes of roostermutaties toegevoegd. De afzonderlijke Work Plan-service en de bestaande planningsruimteformule blijven behouden.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-11-26 (testrelease)
+- Volledige applicatiecode naar strict TypeScript; alle Vue-componenten met script setup en Composition API, geen legacy JS of allowJs.
+- Kalender, capaciteit, medewerkerselectie, header en editor opgesplitst in views/componenten; sessie, gepubliceerde roosters en editor hebben eigen composables.
+- Bestaande API-routes ondergebracht in een getypeerde availability-service boven de centrale Genesys-client; pure response-/tijdlijnhelpers en gedeelde types.
+- Centrale Tailwind-componentklassen, licht/donker-thema en Heroicons; verbindingsinstellingen voor OAuth Client ID/regio bereikbaar in de interface.
+- Leesbare formattering met Prettier en architectuurcontrole in CI. Uitgebreide tests voor parsers, themavoorkeur en bestaande gebruikersflows.
+- Capaciteitsformule, 25%-marge, vijf kolommen, editorbevestiging, OAuth PKCE, historie en read-only gepubliceerde roosters behouden. De gemelde 47,5 uur is correct voor de aangeleverde Work Plan-velden; geen rekenaanpassing of overname van PR #5.
+- Herstelpunt backup/pre-v0.3.0 en deploy-/terugzetinstructies in docs/DEPLOYMENT_V03.md; geen automatische merge of publicatie.
+
+
 ## 0.2.1 — in ontwikkeling
 - Toegevoegd: alleen-lezen roosterhistorie met afzonderlijke aanmaak-, roosterbrede en agentgebonden wijzigingsdatum, vast weergegeven in Europe/Amsterdam.
 - Eerste publicatie en historie per Unavailable Time blijven expliciet ‘Niet beschikbaar’: deze ontbreken in de onderzochte bestaande endpointcontracten. Geen fallback naar aanmaakdatum, blokstart of huidige tijd.
