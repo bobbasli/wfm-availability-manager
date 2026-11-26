@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.2.1 — in ontwikkeling
+- Toegevoegd: alleen-lezen roosterhistorie met afzonderlijke aanmaak-, roosterbrede en agentgebonden wijzigingsdatum, vast weergegeven in Europe/Amsterdam.
+- Eerste publicatie en historie per Unavailable Time blijven expliciet ‘Niet beschikbaar’: deze ontbreken in de onderzochte bestaande endpointcontracten. Geen fallback naar aanmaakdatum, blokstart of huidige tijd.
+- Geteste neutrale vergelijkingslogica voor geverifieerde tijdstempels; zonder betrouwbare bronwaarden worden geen vergelijkingen getoond. Wijzigingen van andere medewerkers worden niet als agentwijziging gebruikt.
+- Audit Logs en rechten onderzocht; geen extra API-calls of scopes toegevoegd. Bronnen en beperkingen vastgelegd in docs/HISTORY.md.
 - Capaciteitstab vereenvoudigd tot vijf kolommen: Medewerker / Work Plan, Betaald / week, Niet beschikbaar, Planbare ruimte en Planbaarheid.
 - Beschikbare tijdsruimte berekend via samengevoegde vensters minus overlappende Unavailable Times; geen maximumcapaciteit of gegenereerde dienstindeling.
 - Instelbare lokaal bewaarde marge (standaard 25%) rekent percentages en kleuren direct opnieuw uit zonder nieuwe API-calls. Percentages boven 100% zijn toegestaan.

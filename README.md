@@ -47,3 +47,10 @@ Flexibele weekuren tonen beide grenzen met afzonderlijke percentages en kleuren;
 De vaste uitleg **Toelichting bij de cijfers** staat direct onder de tabel. De indicator is geen garantie op een geldig rooster: maximale werkdagen, dienstlengtes, rust en andere Work Plan-regels spelen ook een rol. Zie [de methode en beperkingen](docs/CAPACITY_V021.md).
 
 OAuth PKCE, BU/MU/medewerkerselectie, de Unavailable Times-editor en gepubliceerde roosters blijven behouden. Tests gebruiken synthetische gegevens. Een PR naar de ontwikkelbranch voert geen productie-deployment uit.
+
+## Rooster- en beschikbaarheidshistorie
+Boven de kalender staan afzonderlijk de aanmaakdatum van het rooster, eerste publicatie, laatste roosterbrede wijziging en laatste wijziging van het geselecteerde agentrooster. Geldige datums worden weergegeven als `18-11-2026 14:35` in Europe/Amsterdam. De bestaande metadata documenteert roostercreatie en rooster-/agentwijziging, maar geen eerste publicatiedatum. Die staat daarom op **Niet beschikbaar**, zonder creatiedatum als vervanging.
+
+Het bestaande bewerkvenster toont alleen-lezen Aan-gemaakt op, Laatst gewijzigd op en Gewijzigd door. De bestaande Unavailable Time-response documenteert deze gegevens niet, dus ook daar staat **Niet beschikbaar**. Er worden geen historievelden meegestuurd met wijzigingen. Een vóór-/na-vergelijking wordt alleen getoond bij twee betrouwbare bronwaarden; die ontbreken op dit API-pad voor blokhistorie/publicatie. Een wijziging aan een andere medewerker wordt nooit als agentwijziging gebruikt.
+
+Audit Logs zijn onderzocht, maar er zijn geen extra calls of rechten toegevoegd. Zie [HISTORY.md](docs/HISTORY.md) voor de complete veldmatrix, bronnen en beperkingen. Een wijziging na publicatie bewijst geen actor of roosterconflict.

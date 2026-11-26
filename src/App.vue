@@ -1,8 +1,10 @@
 <script setup>
+import ScheduleHistory from './components/ScheduleHistory.vue';
+import AvailabilityHistory from './components/AvailabilityHistory.vue';
 import CapacityTable from './components/CapacityTable.vue';
 import { useDialogFocus } from './composables/useDialogFocus';
 import { useAvailabilityManager } from './composables/useAvailabilityManager';
-const { activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch } = useAvailabilityManager();
+const { activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleHistory,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch } = useAvailabilityManager();
 const { dialog: editorDialog, trapDialogFocus } = useDialogFocus(draft);
 </script>
 <template>
@@ -24,6 +26,7 @@ const { dialog: editorDialog, trapDialogFocus } = useDialogFocus(draft);
 <div class="grid md:grid-cols-2 gap-4"><label class="text-sm font-medium">Vanaf<input type="date" v-model="start" class="mt-1 w-full border rounded-lg p-2"></label><label class="text-sm font-medium">Tot en met<input type="date" v-model="end" class="mt-1 w-full border rounded-lg p-2"></label></div>
 <div class="flex flex-wrap gap-4 text-xs"><span class="flex items-center gap-2"><i class="inline-block h-3 w-3 rounded bg-rose-500"></i>Unavailable Times · bewerken</span><span class="flex items-center gap-2"><i class="inline-block h-3 w-3 rounded bg-emerald-500"></i>Gepubliceerd rooster · alleen lezen</span><span class="flex items-center gap-2"><i class="inline-block h-3 w-3 rounded bg-sky-500"></i>Work Plan · nog niet gekoppeld</span></div>
 <div class="bg-slate-50 rounded-lg p-3 space-y-2"><div class="flex flex-wrap items-center gap-3"><label class="text-sm font-medium">Gepubliceerd rooster <select v-model="selectedSchedule" @change="loadSchedule" :disabled="scheduleBusy || !scheduleCandidates.length" class="ml-2 border rounded-lg p-2 bg-white"><option value="">Selecteer rooster</option><option v-for="x in scheduleCandidates" :key="x.id" :value="x.id">{{x.name}} · {{x.weekId || 'week onbekend'}}</option></select></label><span class="text-xs text-slate-600">{{scheduleBusy?'Ophalen…':scheduleState}}</span></div><p v-if="activityCodeError" class="text-xs text-amber-800">{{activityCodeError}} · Roosterdiensten blijven zichtbaar.</p><p v-if="scheduleError" class="text-sm text-amber-800" role="alert">{{scheduleError}}</p></div>
+<ScheduleHistory v-if="selectedSchedule" :history="scheduleHistory" />
 <p v-if="!lastResponse" class="bg-slate-50 rounded-lg p-4 text-slate-500 text-sm">Selecteer een medewerker; de tijdvakken worden automatisch opgehaald.</p>
 <div v-else-if="!graphSupported" class="border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-4 text-sm">De Unavailable Times konden niet betrouwbaar worden geïnterpreteerd. Zie API-diagnose onderaan.</div>
 <div>
@@ -49,9 +52,10 @@ const { dialog: editorDialog, trapDialogFocus } = useDialogFocus(draft);
   <CapacityTable :rows="capacityRows" :margin="capacityMargin" />
 </section>
 <div v-if="draft" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4" @click.self="closeEditor">
-<div ref="editorDialog" tabindex="-1" @keydown.esc.prevent="closeEditor" @keydown.tab="trapDialogFocus" role="dialog" aria-modal="true" aria-label="Unavailable Time bewerken" class="bg-white w-full max-w-lg rounded-xl shadow-xl p-6 space-y-4">
+<div ref="editorDialog" tabindex="-1" @keydown.esc.prevent="closeEditor" @keydown.tab="trapDialogFocus" role="dialog" aria-modal="true" aria-label="Unavailable Time bewerken" class="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl shadow-xl p-6 space-y-4">
 <div class="flex justify-between items-center"><h2 class="text-lg font-bold">{{editor ? 'Tijdvak bewerken' : 'Tijdvak toevoegen'}}</h2><button @click="closeEditor" class="text-slate-500 text-2xl" aria-label="Sluiten">×</button></div>
 <p class="text-sm text-slate-600">Tijden worden ingevoerd in Europe/Amsterdam en als UTC naar Genesys verzonden. Controleer de gegevens voor opslaan.</p>
+<AvailabilityHistory v-if="editor" :block="editor" :schedule="scheduleHistory" />
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 <div class="space-y-2"><h3 class="font-semibold text-sm">Van</h3><label class="block text-sm">Datum<input v-model="draft.fromDate" type="date" class="mt-1 w-full border rounded-lg p-2"></label><label class="block text-sm">Tijd<input v-model="draft.fromTime" type="time" step="60" class="mt-1 w-full border rounded-lg p-2"></label></div>
 <div class="space-y-2"><h3 class="font-semibold text-sm">Tot</h3><label class="block text-sm">Datum<input v-model="draft.toDate" type="date" class="mt-1 w-full border rounded-lg p-2"></label><label class="block text-sm">Tijd<input v-model="draft.toTime" type="time" step="60" class="mt-1 w-full border rounded-lg p-2"></label></div>

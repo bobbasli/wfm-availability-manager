@@ -1,3 +1,4 @@
+import { readScheduleHistory } from '../domain/history';
 import { useCapacity } from './useCapacity';
 import { createPkceRequest } from '../services/oauth';
 import { localParts, amsterdamToUtc, localDayBounds, isPublished } from '../domain/time';
@@ -29,6 +30,7 @@ export function useAvailabilityManager(){
     // Published schedules are read-only. Never use schedule mutation endpoints.
     const scheduleData=ref(null),scheduleError=ref(''),scheduleBusy=ref(false);
     const scheduleCandidates=ref([]),selectedSchedule=ref(''),scheduleDiagnostics=ref(null);
+    const scheduleHistory=computed(()=>{const loaded=scheduleDiagnostics.value;return readScheduleHistory(loaded?.scheduleId===selectedSchedule.value&&loaded?.agentId===agentId.value?loaded.metadata:null,scheduleData.value,agentId.value,selectedSchedule.value);});
     const scheduleState=ref('Selecteer een medewerker om het rooster op te halen.');
     // Separate weekly MU capacity view. Read-only, never changes agent availability.
     const activeTab=ref('calendar');
@@ -115,7 +117,7 @@ export function useAvailabilityManager(){
     }
     const schedulePublished=isPublished;
     async function discoverSchedules(){
-      scheduleCandidates.value=[];selectedSchedule.value='';scheduleData.value=null;scheduleError.value='';
+      scheduleCandidates.value=[];selectedSchedule.value='';scheduleData.value=null;scheduleDiagnostics.value=null;scheduleError.value='';
       if(!businessUnit.value||!agentId.value)return;
       const bu=businessUnit.value,agent=agentId.value,mu=managementUnit.value;
       const valid=selectionSnapshot(),request=++scheduleRequest;const current=()=>valid()&&request===scheduleRequest;
@@ -136,7 +138,7 @@ export function useAvailabilityManager(){
       finally{if(current())scheduleBusy.value=false;}
     }
     async function loadSchedule(){
-      scheduleData.value=null;scheduleError.value='';
+      scheduleData.value=null;scheduleDiagnostics.value=null;scheduleError.value='';
       const candidate=scheduleCandidates.value.find(x=>x.id===selectedSchedule.value);
       if(!candidate||!businessUnit.value||!managementUnit.value||!agentId.value)return;
       const bu=businessUnit.value,mu=managementUnit.value,agent=agentId.value;
@@ -150,10 +152,10 @@ export function useAvailabilityManager(){
         const metadata=await api(prefix);
         if(!isPublished(metadata))throw Error('Rooster is niet expliciet gepubliceerd volgens de metadata.');
         if(!current())return;
-        scheduleDiagnostics.value={schedule:candidate.raw,resolvedWeekId,metadata};
+        scheduleDiagnostics.value={scheduleId:candidate.id,agentId:agent,schedule:candidate.raw,resolvedWeekId,metadata};
         const result=await api(`${prefix}/agentschedules/query`,'POST',{managementUnitId:mu,userIds:[agent],teamIds:[]});
         if(!current())return;
-        scheduleData.value=result;scheduleDiagnostics.value={schedule:candidate.raw,resolvedWeekId,metadata,response:result};
+        scheduleData.value=result;scheduleDiagnostics.value={scheduleId:candidate.id,agentId:agent,schedule:candidate.raw,resolvedWeekId,metadata,response:result};
         const agentRows=(result?.result?.agentSchedules||result?.agentSchedules||[]).filter(x=>(x.user?.id||x.userId||x.agent?.id||x.agentId)===agent);
         scheduleState.value=scheduleSegments.value.length?'Rooster geladen.':agentRows.length?'Rooster opgehaald; geen diensten zichtbaar binnen de gekozen datums.':'Rooster opgehaald; geen roostergegevens voor deze medewerker. Bekijk de diagnose.';
       }catch(e){if(current()){scheduleError.value=e.message;scheduleState.value='Rooster ophalen mislukt.';}}
@@ -335,5 +337,5 @@ export function useAvailabilityManager(){
     watch([clientId,region],()=>{logout();saveConfig();},{flush:'sync'});
     watch([start,end],()=>{if(agentId.value){loadUnavailable();discoverSchedules();}});
     onMounted(async()=>{try{validateRegion(region.value);await callback();await initialize();}catch(e){sessionStorage.removeItem('wfm_pkce');sessionStorage.removeItem('wfm_state');sessionStorage.removeItem('wfm_oauth_context');setStatus(e.message,true);history.replaceState({},'',redirect+location.hash);}});
-    return {activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
+    return {activeTab,capacityMargin,capacityWeek,capacityBusy,capacityProgress,capacityRows,capacityError,capacityDiagnostics,loadCapacity,hoursText,pctText,activityCodes,activityCodeError,scheduleData,scheduleError,scheduleBusy,scheduleHistory,scheduleRows,loadSchedule,discoverSchedules,scheduleCandidates,selectedSchedule,scheduleDiagnostics,scheduleState,redirect,clientId,region,token,identity,businessUnits,managementUnits,agents,businessUnit,managementUnit,agentId,start,end,queryBody,patchBody,confirmed,lastResponse,records,graphRows,graphSupported,editor,draft,draftValid,editError,openEditor,closeEditor,submitChange,saving,raw,status,error,busy,saveConfig,login,logout,loadManagementUnits,loadAgents,resetAgentData,loadUnavailable,savePatch};
 }
